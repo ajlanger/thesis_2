@@ -1,0 +1,9 @@
+name: thesisenv
+channels:
+  - defaults
+dependencies:
+  - python=3.8
+  - ipykernel
+  - pandas
+prefix: /home/arnaud/anaconda3/envs/thesisenv
+
