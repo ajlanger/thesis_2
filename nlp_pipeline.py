@@ -169,6 +169,40 @@ def get_chunk_targets(syn_parse_copy, chunk):
         syn_parse_copy = syn_parse_copy[syn_parse_copy.lower().find('('+chunk+' ')+2:]
     return targets
 
+
+def extract_words(target):
+    if nill(target):
+        return []
+    elif len(target) == 1 and type(target[0]) is type([]):
+        return extract_words(target[0])
+    elif len(target) == 2 and type(target[0]) is type('str') and type(target[1]) is type('str'):
+        return target[1]
+    elif type(target[0]) is type([]) and type(target[1]) is type([]):
+        return extract_words(car(target)), extract_words(cdr(target))
+    elif type(target[0]) is type('str') and type(target[1]) is type([]):
+        return extract_words(cdr(target))
+
+
+def clean_statement(statement):
+    statement = str(extract_words(statement))
+    statement = statement.replace('(', '')
+    statement = statement.replace(')', '')
+    statement = statement.replace("'", '')
+    statement = statement.replace(',', '')
+    return statement
+
+
+def car(a_list):
+    return a_list[0]
+
+
+def cdr(a_list):
+    return a_list[1:]
+
+
+def nill(a_list):
+    return len(a_list) == 0
+
 # --------------------------------------------------------------------------------------------------
 # %% md
 # # Data processing part
@@ -504,19 +538,7 @@ df = pd.DataFrame(data=pandas_dict)
 
 # %% Syntacticly based
 layered_chunk_dict
-for i in layered_chunk_dict:
-    if i == 'SBAR':
-        for i2 in layered_chunk_dict[i][0][i]:
-            print(i2)
 
-layered_chunk_dict['SBAR'][0]['SBAR']
-output_sentence = ''
-for i in layered_chunk_dict['SBAR'][0]['SBAR']:
-    print(i)
-    if type(i[1]) is not type([]):
-        output_sentence += i[1]
-    elif type(i[1]) is type([]):
-        for i2 in i[1]:
-            print(i2)
+target_chunk = layered_chunk_dict['VP'][1]['VP']
 
-output_sentence
+clean_statement(target_chunk)
