@@ -203,14 +203,116 @@ def cdr(a_list):
 def nill(a_list):
     return len(a_list) == 0
 
+
+def to_nltk_tree(node):
+    if node.n_lefts + node.n_rights > 0:
+        return Tree(node.orth_, [to_nltk_tree(child) for child in node.children])
+    else:
+        return node.orth_
+
+# The magic stuff (for now)
+
+def condition_consequence_extractor(doc):
+    for word in doc:
+        if word.text.lower() in ['if', 'assuming that', 'conceding that', 'granted that', 'in case that', 'on the assumption that', 'supposing that', 'whenever', 'wherever', 'condtion', 'then', 'when', 'unless', 'in case of']:
+            try:
+                output = extract_condition_consequence_2(doc)
+            except:
+                output = extract_condition_consequence_1(doc)
+            return output
+    return 'No conditional statement in sentence'
+
+
+def extract_condition_consequence_1(doc):
+    condition = []
+    consequence = []
+    for token in doc:
+        if token.dep_ == 'advcl':
+            [condition.append(child) for child in token.subtree]
+        if token.dep_ == 'ROOT':
+            before =[]
+            after = []
+            for child in token.children:
+                if child.dep_ != 'advcl':
+                    if child.idx < token.idx:
+                        [before.append(i) for i in child.subtree]
+                    else:
+                        [after.append(i) for i in child.subtree]
+            for i in before:
+                consequence.append(i)
+            consequence.append(token)
+            for i in after:
+                consequence.append(i)
+    return {'condition': condition, 'consequence': consequence}
+
+
+def extract_condition_consequence_2(doc):
+    consequence = []
+    condition = []
+    for token in doc:
+        if token.dep_ == 'advcl':
+            [condition.append(child) for child in token.subtree]
+    # find the child with the outcoming advcl relation
+    for token in doc:
+        for child in token.children:
+            if child.dep_ == 'advcl':
+                advcl_parent = token
+    advcl_parent_children = []
+    for child in advcl_parent.children:
+        if child.dep_ != 'advcl':
+            [advcl_parent_children.append(sub) for sub in child.subtree]
+    temp_output = []
+    advcl_parent_parents = []
+    for parent in advcl_parent.ancestors:
+        advcl_parent_parents.append(parent)
+        for sub in parent.children:
+            if sub != advcl_parent:
+                temp_output.append(get_token_children(sub))
+    full_string = []
+    for el in temp_output[0]:
+        if type(el) is list:
+            for sublist in el:
+                full_string = [sublist] + full_string
+        else:
+            full_string = [el] + full_string
+    garbage = []
+    garbage.append(advcl_parent)
+    garbage.extend(advcl_parent_parents)
+    garbage.extend(full_string)
+    garbage.extend(advcl_parent_children)
+
+    # setting the consequence in good order
+    consequence_numbers = []
+    for word in garbage:
+        consequence_numbers.append(word.idx)
+    consequence_numbers.sort()
+    for i in consequence_numbers:
+        for word in garbage:
+            if i == word.idx:
+                consequence.append(word)
+
+    return {'condition': condition, 'consequence': consequence}
+
+
+def get_token_children(token):
+    if token.is_sent_start:
+        return token
+    else:
+        return token, [get_token_children(child) for child in token.children]
+
+
+
+
+
+# Extract condition and consequence out of 1 sentence. X -> Y or Y -> X
+
 # --------------------------------------------------------------------------------------------------
 # %% md
 # # Data processing part
 # %% Extract all data from the text data and make list ---------------------------------------------
-filename = '../thesis/thesis_code/training_data'
+filename = 'raw_data.txt'
 temp_file = open(filename, 'r').read()
 temp_list = temp_file.split('\n')
-
 # %% Make data dict --------------------------------------------------------------------------------
 # Remove unnecesarry characters
 only_sentences = []
@@ -397,8 +499,8 @@ pd.concat([df1,df2,df3,df4,df5], axis=1, sort=False)
 # %% Syntactic paring ------------------------------------------------------------------------------
 
 sentence_pos = sentences_POS_stNLP['Dataset_1'][0]
-sentence_normal = sentences_STNLP['Dataset_1'][0]
-
+sentence_normal = sentences_STNLP['Dataset_3'][0]
+sentence_normal
 # ....... with NLTK ----> Intersting to build own grammars
 grammar1 = r"""NP: {<DT><NN>}
                    {<NNP>+}
@@ -423,6 +525,8 @@ corenlp_syn_parse = nlp_wrapper.parse(sentence_normal)
 nlp_wrapper.close()
 
 syn_list = convert_parsed_string_to_list(corenlp_syn_parse) # Get parsed syntax
+
+syn_list
 
 chunk_dict = {} # Get desired chunks
 for chunk in ['ROOT','S', 'NP','VP', 'ADJP', 'SBAR', 'ADVP']:
@@ -466,11 +570,13 @@ print(*[f"index: {word.index.rjust(2)}\tword: {word.text.ljust(11)}\tgovernor in
 
 
 # ....... with spacy -------------------------------------------------------------------------------
-texts = [only_sentences[1]]
+texts = [only_sentences[3]]
+texts
 text = texts[0]
-doc = sp(sentence_normal)
+doc = sp(text)
 
-depparse = {} # Navigating parse tree
+# Navigating parse tree
+depparse = {}
 text, dep, head_text, head_pos, children = ([] for i in range(5)) # Initialize lists
 for token in doc:
     text.append(token.text), dep.append(token.dep_), head_text.append(token.head.text), head_pos.append(token.head.pos_),children.append([child for child in token.children])
@@ -489,12 +595,20 @@ depparse['children'] = children
 
 df_temp = pd.DataFrame(depparse)
 df_temp
-
 # Display the dependency parse
-displacy.serve(sentences_spacy['Dataset_1'][0],style="dep")
+displacy.serve(doc,style="dep")
 
 
-# ....... with CoreNLP ----> Gives full parse (semantic)
+for sentence in sentences_spacy['Dataset_4']:
+    print('-----------------------------------------------')
+    print(sentence)
+    temp_doc = sp(str(sentence))
+    print(condition_consequence_extractor(temp_doc))
+    print('-----------------------------------------------')
+
+
+
+d# ....... with CoreNLP ----> Gives full parse (semantic)
 
 nlp_wrapper = StanfordCoreNLP(r'../thesis/stanfordfiles/stanford-corenlp-full-2017-06-09')
 corenlp_depparse = nlp_wrapper.annotate(sentence_normal, properties={'annotators': 'depparse', 'outputFormat': 'json'})

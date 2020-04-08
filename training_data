@@ -1,2 +1,8 @@
 Dataset_1
-If the customer is 21 years old, then he needs to pay 200 euros.
+If the customer is 21 years old, then he needs to pay 200 euros on a monthly base.
+
+Dataset_2
+If the customer is 21 years old, he needs to pay 200 euros on a monthly base.
+
+Dataset_3
+The customer needs to pay 200 euros on a monthly base if he is 21 years old.
