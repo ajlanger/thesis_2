@@ -213,14 +213,14 @@ def to_nltk_tree(node):
 # The magic stuff (for now)
 
 def condition_consequence_extractor(doc):
-    for word in doc:
-        if word.text.lower() in ['if', 'assuming that', 'conceding that', 'granted that', 'in case that', 'on the assumption that', 'supposing that', 'whenever', 'wherever', 'condtion', 'then', 'when', 'unless', 'in case of']:
-            try:
-                output = extract_condition_consequence_2(doc)
-            except:
-                output = extract_condition_consequence_1(doc)
-            return output
-    return 'No conditional statement in sentence'
+    if condition_identifier(doc.text):
+        try:
+            output = extract_condition_consequence_2(doc)
+        except:
+            output = extract_condition_consequence_1(doc)
+        return output
+    else:
+        return 'No conditional statement in sentence'
 
 
 def extract_condition_consequence_1(doc):
@@ -301,8 +301,18 @@ def get_token_children(token):
         return token, [get_token_children(child) for child in token.children]
 
 
-
-
+def condition_identifier(sentence):
+    if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
+    if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ']
+    # Check words
+    for sentence_word in nltk.word_tokenize(sentence):
+        if sentence_word.lower() in if_then_synonyms_words:
+            return True
+        else:
+            for wordphrase in if_then_synonyms_phrase:
+                if wordphrase in sentence.lower():
+                    return True
+    return False
 
 # Extract condition and consequence out of 1 sentence. X -> Y or Y -> X
 
@@ -310,7 +320,7 @@ def get_token_children(token):
 # %% md
 # # Data processing part
 # %% Extract all data from the text data and make list ---------------------------------------------
-filename = 'raw_data.txt'
+filename = 'C:/Users/Arnaud/Google Drive/Master of AI/3. Thesis/thesis_2/raw_data.txt'
 temp_file = open(filename, 'r').read()
 temp_list = temp_file.split('\n')
 # %% Make data dict --------------------------------------------------------------------------------
@@ -569,11 +579,10 @@ sentence = nlp(sentence_normal)
 print(*[f"index: {word.index.rjust(2)}\tword: {word.text.ljust(11)}\tgovernor index: {word.governor}\tgovernor: {(doc.sentences[0].words[word.governor-1].text if word.governor > 0 else 'root').ljust(11)}\tdeprel: {word.dependency_relation}" for word in doc.sentences[0].words], sep='\n') # --> Not that good
 
 
-# ....... with spacy -------------------------------------------------------------------------------
+# %%....... with spacy -------------------------------------------------------------------------------
 texts = [only_sentences[3]]
-texts
 text = texts[0]
-doc = sp(text)
+doc = sp(texts)
 
 # Navigating parse tree
 depparse = {}
@@ -594,21 +603,12 @@ depparse['head_pos'] = head_pos
 depparse['children'] = children
 
 df_temp = pd.DataFrame(depparse)
-df_temp
+
 # Display the dependency parse
 displacy.serve(doc,style="dep")
 
 
-for sentence in sentences_spacy['Dataset_4']:
-    print('-----------------------------------------------')
-    print(sentence)
-    temp_doc = sp(str(sentence))
-    print(condition_consequence_extractor(temp_doc))
-    print('-----------------------------------------------')
-
-
-
-d# ....... with CoreNLP ----> Gives full parse (semantic)
+# %% ....... with CoreNLP ----> Gives full parse (semantic)
 
 nlp_wrapper = StanfordCoreNLP(r'../thesis/stanfordfiles/stanford-corenlp-full-2017-06-09')
 corenlp_depparse = nlp_wrapper.annotate(sentence_normal, properties={'annotators': 'depparse', 'outputFormat': 'json'})
@@ -617,42 +617,28 @@ nlp_wrapper.close()
 workdoc = json.loads(corenlp_depparse)['sentences']
 workdoc[0]['basicDependencies']
 
-# --------------------------------------------------------------------------------------------------
-# %% Begin "manual" classification -----------------------------------------------------------------
-if_then_synonyms = ['if', 'assuming that', 'conceding that', 'granted that', 'in case that', 'on the assumption that', 'supposing that', 'whenever', 'wherever', 'condtion', 'then', 'when', 'unless']
 
-# %% Create dict for pandas framework
-pandas_dict = {'Sentence_ID':[], 'Sentence':[], 'Condition_statement':[]}
-for i in sentences_STNLP:
-    for sentence in sentences_STNLP[i]:
-        pandas_dict['Sentence_ID'].append(i),
-        pandas_dict['Sentence'].append(sentence),
-        condition_present = False
-        for word in if_then_synonyms:
-            if sentence.lower().find(word) > -1:
-                condition_present = True
-        if condition_present:
-            pandas_dict['Condition_statement'].append(1)
-        else:
-            pandas_dict['Condition_statement'].append(0)
+# %% Main
+for sentence in sentences_spacy['Dataset_2']:
+    print('-----------------------------------------------')
+    print(sentence)
+    temp_doc = sp(str(sentence))
+    print(condition_consequence_extractor(temp_doc))
+    print('-----------------------------------------------')
 
+# %%
+import spacy
+from spacy import displacy
 
-df = pd.DataFrame(data=pandas_dict)
+nlp = spacy.load("en_core_web_sm")
 
-# --------------------------------------------------------------------------------------------------
-# %% Coreference resolution ------------------------------------------------------------------------
-# ....... with spacy -------------------------------------------------------------------------------
-# neuralcoref.add_to_pipe(sp)
-# doc = sp(sentence_normal)
-# doc
+doc = nlp('In case that a person is between 19 and 21 years old and was not involved in a car accident, car insurance costs 500 euros.')
+print(doc)
 
+html = displacy.render(doc, style='dep', page=True)
 
-# --------------------------------------------------------------------------------------------------
-# %% Extraction of IF.. THEN information -----------------------------------------------------------
+from IPython.core.display import display, HTML
 
-# %% Syntacticly based
-layered_chunk_dict
+html = displacy.render(doc, style="dep")
+display(HTML(html))
 
-target_chunk = layered_chunk_dict['VP'][1]['VP']
-
-clean_statement(target_chunk)
