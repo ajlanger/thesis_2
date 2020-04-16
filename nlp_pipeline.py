@@ -320,7 +320,8 @@ def condition_identifier(sentence):
 # %% md
 # # Data processing part
 # %% Extract all data from the text data and make list ---------------------------------------------
-filename = 'C:/Users/Arnaud/Google Drive/Master of AI/3. Thesis/thesis_2/raw_data.txt'
+#filename = 'C:/Users/Arnaud/Google Drive/Master of AI/3. Thesis/thesis_2/raw_data.txt'
+filename = 'raw_data.txt'
 temp_file = open(filename, 'r').read()
 temp_list = temp_file.split('\n')
 # %% Make data dict --------------------------------------------------------------------------------
@@ -530,6 +531,7 @@ sentences_spacy['Dataset_1'][0]
 spacy_noun_chunks = sentences_spacy['Dataset_1'][0].noun_chunks
 
 # ....... with CoreNLP ----> Gives full parse (syntactic)
+sentence_normal = 'In case that a person is between 19 and 21 years old and was not involved in a car accident, car insurance costs 500 euros.'
 nlp_wrapper = StanfordCoreNLP(r'../thesis/stanfordfiles/stanford-corenlp-full-2017-06-09')
 corenlp_syn_parse = nlp_wrapper.parse(sentence_normal)
 nlp_wrapper.close()
@@ -580,9 +582,10 @@ print(*[f"index: {word.index.rjust(2)}\tword: {word.text.ljust(11)}\tgovernor in
 
 
 # %%....... with spacy -------------------------------------------------------------------------------
-texts = [only_sentences[3]]
-text = texts[0]
-doc = sp(texts)
+#texts = [only_sentences[3]]
+#text = texts[0]
+#doc = sp(texts)
+doc = sp('In case that a person is between 19 and 21 years old and was not involved in a car accident, car insurance costs 500 euros.')
 
 # Navigating parse tree
 depparse = {}
@@ -603,7 +606,7 @@ depparse['head_pos'] = head_pos
 depparse['children'] = children
 
 df_temp = pd.DataFrame(depparse)
-
+df_temp
 # Display the dependency parse
 displacy.serve(doc,style="dep")
 
@@ -627,18 +630,5 @@ for sentence in sentences_spacy['Dataset_2']:
     print('-----------------------------------------------')
 
 # %%
-import spacy
-from spacy import displacy
-
-nlp = spacy.load("en_core_web_sm")
-
-doc = nlp('In case that a person is between 19 and 21 years old and was not involved in a car accident, car insurance costs 500 euros.')
-print(doc)
-
-html = displacy.render(doc, style='dep', page=True)
-
-from IPython.core.display import display, HTML
-
-html = displacy.render(doc, style="dep")
-display(HTML(html))
-
+print(condition_consequence_extractor(doc))
+displacy.serve(doc,style="dep")
