@@ -62,6 +62,14 @@ dep_dict = {
 # --------------------------------------------------------------------------------------------------
 # %% Functions -------------------------------------------------------------------------------------
 
+#     #
+#     # ###### #      #####     ###### #    # #    #  ####  ##### #  ####  #    #  ####
+#     # #      #      #    #    #      #    # ##   # #    #   #   # #    # ##   # #
+####### #####  #      #    #    #####  #    # # #  # #        #   # #    # # #  #  ####
+#     # #      #      #####     #      #    # #  # # #        #   # #    # #  # #      #
+#     # #      #      #         #      #    # #   ## #    #   #   # #    # #   ## #    #
+#     # ###### ###### #         #       ####  #    #  ####    #   #  ####  #    #  ####
+
 def sent_tokenize_stnlp(paragraph):
     output = []
     doc = nlp(paragraph)
@@ -210,14 +218,58 @@ def to_nltk_tree(node):
     else:
         return node.orth_
 
+
+def output_empty(output):
+    for key in output:
+        if output[key] == []:
+            return True
+    else:
+        return False
+
 # The magic stuff (for now)
 
+ ####   ####  #    # #####  # ##### #  ####  #    #
+#    # #    # ##   # #    # #   #   # #    # ##   #
+#      #    # # #  # #    # #   #   # #    # # #  #
+#      #    # #  # # #    # #   #   # #    # #  # #
+#    # #    # #   ## #    # #   #   # #    # #   ##
+ ####   ####  #    # #####  #   #   #  ####  #    #
+
+
+###### #    # ##### #####    ##    ####  #####  ####  #####   ####
+#       #  #    #   #    #  #  #  #    #   #   #    # #    # #
+#####    ##     #   #    # #    # #        #   #    # #    #  ####
+#        ##     #   #####  ###### #        #   #    # #####       #
+#       #  #    #   #   #  #    # #    #   #   #    # #   #  #    #
+###### #    #   #   #    # #    #  ####    #    ####  #    #  ####
+
+
+def condition_and_consequence_together(cond,cons):
+    condition_sentence = ''
+    consequence_sentence = ''
+    for word in cond:
+        condition_sentence += word.text + ' '
+    for word in cons:
+        consequence_sentence += word.text + ' '
+    if condition_sentence in consequence_sentence:
+        return True
+    else:
+        return False
+
+
 def condition_consequence_extractor(doc):
+    # First check whether there is a conditional statement in the sentence
     if condition_identifier(doc.text):
         try:
             output = extract_condition_consequence_2(doc)
         except:
             output = extract_condition_consequence_1(doc)
+        # Check if none of the outputs is empty, if so search for other completion
+        if output_empty(output):
+            output = extract_condition_consequence_3(doc)
+        # Last part added to check whether cond and cons are together in output (bad)
+        if condition_and_consequence_together(output['condition'], output['consequence']):
+            output = extract_condition_consequence_4(doc)
         return output
     else:
         return 'No conditional statement in sentence'
@@ -235,8 +287,10 @@ def extract_condition_consequence_1(doc):
             for child in token.children:
                 if child.dep_ != 'advcl':
                     if child.idx < token.idx:
+                        # Append everything before root
                         [before.append(i) for i in child.subtree]
                     else:
+                        # Append everything after root
                         [after.append(i) for i in child.subtree]
             for i in before:
                 consequence.append(i)
@@ -294,16 +348,61 @@ def extract_condition_consequence_2(doc):
     return {'condition': condition, 'consequence': consequence}
 
 
+def extract_condition_consequence_3(doc):
+    condition = []
+    consequence = []
+    for token in doc:
+        if token.dep_ == 'prep':
+            [condition.append(child) for child in token.subtree]
+        if token.dep_ == 'ROOT':
+            before =[]
+            after = []
+            for child in token.children:
+                if child.dep_ != 'prep':
+                    if child.idx < token.idx:
+                        [before.append(i) for i in child.subtree]
+                    else:
+                        [after.append(i) for i in child.subtree]
+            for i in before:
+                consequence.append(i)
+            consequence.append(token)
+            for i in after:
+                consequence.append(i)
+    return {'condition': condition, 'consequence': consequence}
+
+
+def extract_condition_consequence_4(doc):
+    for word in doc:
+        if word.dep_ == 'advcl':
+            advcl_head = word.head
+            consequence = [i for i in advcl_head.subtree]
+            condition = [i for i in word.subtree]
+
+            condition_sentence = ''
+            consequence_sentence = ''
+            for word in condition:
+                condition_sentence += word.text + ' '
+            for word in consequence:
+                consequence_sentence += word.text + ' '
+
+    if condition_sentence in consequence_sentence:
+        if condition_sentence.find(consequence_sentence) == 0:
+            consequence = consequence[0:len(condition)+1]
+        else:
+            consequence = consequence[len(condition):]
+    return {'condition': condition, 'consequence': consequence}
+
+
+
 def get_token_children(token):
     if token.is_sent_start:
         return token
     else:
         return token, [get_token_children(child) for child in token.children]
 
-
 def condition_identifier(sentence):
     if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
-    if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ']
+    if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ']
     # Check words
     for sentence_word in nltk.word_tokenize(sentence):
         if sentence_word.lower() in if_then_synonyms_words:
@@ -314,7 +413,14 @@ def condition_identifier(sentence):
                     return True
     return False
 
-# Extract condition and consequence out of 1 sentence. X -> Y or Y -> X
+
+######
+#     # # #####  ###### #      # #    # ######
+#     # # #    # #      #      # ##   # #
+######  # #    # #####  #      # # #  # #####
+#       # #####  #      #      # #  # # #
+#       # #      #      #      # #   ## #
+#       # #      ###### ###### # #    # ######
 
 # --------------------------------------------------------------------------------------------------
 # %% md
@@ -581,11 +687,21 @@ sentence = nlp(sentence_normal)
 print(*[f"index: {word.index.rjust(2)}\tword: {word.text.ljust(11)}\tgovernor index: {word.governor}\tgovernor: {(doc.sentences[0].words[word.governor-1].text if word.governor > 0 else 'root').ljust(11)}\tdeprel: {word.dependency_relation}" for word in doc.sentences[0].words], sep='\n') # --> Not that good
 
 
+# %% ....... with CoreNLP ----> Gives full parse (dependency)
+sentence_normal = "It is very simple, if the student needs to commute, then the student has right of a permit."
+nlp_wrapper = StanfordCoreNLP(r'../thesis/stanfordfiles/stanford-corenlp-full-2017-06-09')
+corenlp_depparse = nlp_wrapper.annotate(sentence_normal, properties={'annotators': 'depparse', 'outputFormat': 'json'})
+nlp_wrapper.close()
+
+workdoc = json.loads(corenlp_depparse)['sentences']
+workdoc[0]['basicDependencies']
+
+
 # %%....... with spacy -------------------------------------------------------------------------------
 #texts = [only_sentences[3]]
 #text = texts[0]
 #doc = sp(texts)
-doc = sp('In case that a person is between 19 and 21 years old and was not involved in a car accident, car insurance costs 500 euros.')
+doc = sp("It is very simple, if the student needs to commute, then the student has right of a permit.")
 
 # Navigating parse tree
 depparse = {}
@@ -607,22 +723,9 @@ depparse['children'] = children
 
 df_temp = pd.DataFrame(depparse)
 df_temp
-# Display the dependency parse
-displacy.serve(doc,style="dep")
-
-
-# %% ....... with CoreNLP ----> Gives full parse (semantic)
-
-nlp_wrapper = StanfordCoreNLP(r'../thesis/stanfordfiles/stanford-corenlp-full-2017-06-09')
-corenlp_depparse = nlp_wrapper.annotate(sentence_normal, properties={'annotators': 'depparse', 'outputFormat': 'json'})
-nlp_wrapper.close()
-
-workdoc = json.loads(corenlp_depparse)['sentences']
-workdoc[0]['basicDependencies']
-
 
 # %% Main
-for sentence in sentences_spacy['Dataset_2']:
+for sentence in sentences_spacy['Dataset_1']:
     print('-----------------------------------------------')
     print(sentence)
     temp_doc = sp(str(sentence))
@@ -630,5 +733,8 @@ for sentence in sentences_spacy['Dataset_2']:
     print('-----------------------------------------------')
 
 # %%
-print(condition_consequence_extractor(doc))
+doc = sp("On the other hand, in case of rainy weather on Tuesday, tomato sandwiches need to be made.")
+
+extract_condition_consequence_3(doc)
+
 displacy.serve(doc,style="dep")
