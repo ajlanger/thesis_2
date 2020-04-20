@@ -1,0 +1,15 @@
+import nlp_pipeline
+
+
+
+# %%
+temp_list = nlp_pipeline.get_texts('raw_data.txt')
+
+
+# %% Main
+for sentence in sentences_spacy['Dataset_1']:
+    print('-----------------------------------------------')
+    print(sentence)
+    temp_doc = sp(str(sentence))
+    print(nlp_pipeline.condition_consequence_extractor(temp_doc))
+    print('-----------------------------------------------')
