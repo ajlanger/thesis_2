@@ -30,7 +30,7 @@ spacy.prefer_gpu()
 nlp = stanfordnlp.Pipeline(processors='tokenize', lang='en')
 sp = spacy.load('en_core_web_sm')
 # nltk.download('wordnet')
-
+# neuralcoref.add_to_pipe(sp)
 pos_dict = {
 # For NLTK pos tagger
 'CC': 'coordinating conjunction','CD': 'cardinal digit','DT': 'determiner',
@@ -270,6 +270,7 @@ def condition_consequence_extractor(doc):
         # Last part added to check whether cond and cons are together in output (bad)
         if condition_and_consequence_together(output['condition'], output['consequence']):
             output = extract_condition_consequence_4(doc)
+        output = {'condition': remove_duplicate_chunks(output['condition']), 'consequence': remove_duplicate_chunks(output['consequence'])}
         return output
     else:
         return 'No conditional statement in sentence'
@@ -285,7 +286,7 @@ def extract_condition_consequence_1(doc):
             before =[]
             after = []
             for child in token.children:
-                if child.dep_ != 'advcl':
+                if child.dep_ != 'advcl' and child.dep_ != 'prep' and child.dep_ != 'advmod':
                     if child.idx < token.idx:
                         # Append everything before root
                         [before.append(i) for i in child.subtree]
@@ -372,6 +373,11 @@ def extract_condition_consequence_3(doc):
 
 
 def extract_condition_consequence_4(doc):
+    """""""""
+    This function was made in order to correctly extract this example:
+    It's very simple, if the student needs to commute, then the student has right of a permit.
+    {'condition': [if, the, student, needs, to, commute], 'consequence': [,, then, the, student, has, right, of, a, permit]}
+    """""""""
     for word in doc:
         if word.dep_ == 'advcl':
             advcl_head = word.head
@@ -392,6 +398,18 @@ def extract_condition_consequence_4(doc):
             consequence = consequence[len(condition):]
     return {'condition': condition, 'consequence': consequence}
 
+
+def remove_duplicate_chunks(words_list):
+    temp_index_list = []
+    output = []
+    for word in words_list:
+        temp_index_list.append(word.idx)
+    idx_uniques = list(dict.fromkeys(temp_index_list))
+    for i in words_list:
+        if i.idx in idx_uniques:
+            output.append(i)
+            idx_uniques.remove(i.idx)
+    return output
 
 
 def get_token_children(token):
@@ -427,15 +445,24 @@ def condition_identifier(sentence):
 # # Data processing part
 # %% Extract all data from the text data and make list ---------------------------------------------
 #filename = 'C:/Users/Arnaud/Google Drive/Master of AI/3. Thesis/thesis_2/raw_data.txt'
-filename = 'raw_data.txt'
-temp_file = open(filename, 'r').read()
-temp_list = temp_file.split('\n')
+def get_texts(filename):
+    filename = filename
+    temp_file = open(filename, 'r').read()
+    temp_list = temp_file.split('\n')
+    return temp_list
+
+temp_list = get_texts('raw_data.txt')
 # %% Make data dict --------------------------------------------------------------------------------
 # Remove unnecesarry characters
-only_sentences = []
-for sentence in temp_list:
-    if sentence != '':
-        only_sentences.append(sentence)
+
+def get_only_sentences(temp_list):
+    only_sentences = []
+    for sentence in temp_list:
+        if sentence != '':
+            only_sentences.append(sentence)
+    return only_sentences
+
+only_sentences = get_only_sentences(temp_list)
 
 # --------------------------------------------------------------------------------------------------
 # %% Split into single sentences -------------------------------------------------------------------
@@ -725,7 +752,7 @@ df_temp = pd.DataFrame(depparse)
 df_temp
 
 # %% Main
-for sentence in sentences_spacy['Dataset_1']:
+for sentence in sentences_spacy['Dataset_4']:
     print('-----------------------------------------------')
     print(sentence)
     temp_doc = sp(str(sentence))
@@ -733,8 +760,26 @@ for sentence in sentences_spacy['Dataset_1']:
     print('-----------------------------------------------')
 
 # %%
-doc = sp("On the other hand, in case of rainy weather on Tuesday, tomato sandwiches need to be made.")
-
-extract_condition_consequence_3(doc)
-
+doc = sp("If the car is blue, it should be washed.")
 displacy.serve(doc,style="dep")
+
+
+# %% Before continuing, I need other information of the individual sentences since in one senctence, there could be references to the same entity
+neuralcoref.add_to_pipe(sp)
+
+# %%
+coref = sp("If the car is blue, it should be washed.")
+print(coref._.coref_clusters)
+
+# %% Extraction of seperate elements and their meta information
+""""""""""
+
+"""""""""
+
+condition = condition_consequence_extractor(doc)['condition']
+consequence = condition_consequence_extractor(doc)['consequence']
+
+
+
+condition
+consequence
