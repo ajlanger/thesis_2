@@ -251,7 +251,10 @@ def condition_and_consequence_together(cond,cons):
         condition_sentence += word.text + ' '
     for word in cons:
         consequence_sentence += word.text + ' '
-    if condition_sentence in consequence_sentence:
+    if condition_sentence in consequence_sentence or consequence_sentence in condition_sentence:
+        print('here')
+        return True
+    elif cond[-1].idx > cons[0].idx and cons[-1].idx > cond[0].idx:
         return True
     else:
         return False
@@ -390,12 +393,11 @@ def extract_condition_consequence_4(doc):
                 condition_sentence += word.text + ' '
             for word in consequence:
                 consequence_sentence += word.text + ' '
-
     if condition_sentence in consequence_sentence:
         if condition_sentence.find(consequence_sentence) == 0:
             consequence = consequence[0:len(condition)+1]
         else:
-            consequence = consequence[len(condition):]
+            consequence = consequence[consequence.index(condition[-1])+1:]
     return {'condition': condition, 'consequence': consequence}
 
 
@@ -728,7 +730,7 @@ workdoc[0]['basicDependencies']
 #texts = [only_sentences[3]]
 #text = texts[0]
 #doc = sp(texts)
-doc = sp("It is very simple, if the student needs to commute, then the student has right of a permit.")
+doc = sp("It is very simple, if the student needs to commute, then he has right of a permit.")
 
 # Navigating parse tree
 depparse = {}
@@ -752,7 +754,7 @@ df_temp = pd.DataFrame(depparse)
 df_temp
 
 # %% Main
-for sentence in sentences_spacy['Dataset_4']:
+for sentence in sentences_spacy['Dataset_3']:
     print('-----------------------------------------------')
     print(sentence)
     temp_doc = sp(str(sentence))
@@ -760,7 +762,6 @@ for sentence in sentences_spacy['Dataset_4']:
     print('-----------------------------------------------')
 
 # %%
-doc = sp("If the car is blue, it should be washed.")
 displacy.serve(doc,style="dep")
 
 
@@ -778,8 +779,5 @@ print(coref._.coref_clusters)
 
 condition = condition_consequence_extractor(doc)['condition']
 consequence = condition_consequence_extractor(doc)['consequence']
-
-
-
 condition
 consequence
