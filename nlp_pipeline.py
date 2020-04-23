@@ -29,8 +29,8 @@ from sklearn.pipeline import Pipeline
 spacy.prefer_gpu()
 nlp = stanfordnlp.Pipeline(processors='tokenize', lang='en')
 sp = spacy.load('en_core_web_sm')
-# nltk.download('wordnet')
-# neuralcoref.add_to_pipe(sp)
+
+
 pos_dict = {
 # For NLTK pos tagger
 'CC': 'coordinating conjunction','CD': 'cardinal digit','DT': 'determiner',
@@ -251,13 +251,24 @@ def condition_and_consequence_together(cond,cons):
         condition_sentence += word.text + ' '
     for word in cons:
         consequence_sentence += word.text + ' '
-    if condition_sentence in consequence_sentence or consequence_sentence in condition_sentence:
-        print('here')
-        return True
-    elif cond[-1].idx > cons[0].idx and cons[-1].idx > cond[0].idx:
-        return True
-    else:
-        return False
+    if condition_sentence in consequence_sentence:
+        # Shorten consequence part
+        cons = remove_wrong_part(cond, cons)
+    elif consequence_sentence in condition_sentence:
+        # Shorten condition part
+        cond = remove_wrong_part(cons, cond)
+    return {'condition': cond, 'consequence': cons}
+
+
+def remove_wrong_part(companion, list_to_shorten):
+    companion_idx = [i.idx for i in companion]
+    pop_list = []
+    for i in range(0, len(list_to_shorten)):
+        if list_to_shorten[i].idx in companion_idx:
+            pop_list.append(i)
+    for i in sorted(pop_list, reverse=True):
+        del list_to_shorten[i]
+    return list_to_shorten
 
 
 def condition_consequence_extractor(doc):
@@ -271,9 +282,10 @@ def condition_consequence_extractor(doc):
         if output_empty(output):
             output = extract_condition_consequence_3(doc)
         # Last part added to check whether cond and cons are together in output (bad)
-        if condition_and_consequence_together(output['condition'], output['consequence']):
-            output = extract_condition_consequence_4(doc)
+        #if condition_and_consequence_together(output['condition'], output['consequence']):
+        #    output = extract_condition_consequence_4(doc)
         output = {'condition': remove_duplicate_chunks(output['condition']), 'consequence': remove_duplicate_chunks(output['consequence'])}
+        output = condition_and_consequence_together(output['condition'], output['consequence'])
         return output
     else:
         return 'No conditional statement in sentence'
@@ -377,12 +389,13 @@ def extract_condition_consequence_3(doc):
 
 def extract_condition_consequence_4(doc):
     """""""""
+    --> This function is temporarily broken (23/04)
     This function was made in order to correctly extract this example:
     It's very simple, if the student needs to commute, then the student has right of a permit.
     {'condition': [if, the, student, needs, to, commute], 'consequence': [,, then, the, student, has, right, of, a, permit]}
     """""""""
     for word in doc:
-        if word.dep_ == 'advcl':
+        if word.dep_ == 'advcl' or word.dep_ == 'prep':
             advcl_head = word.head
             consequence = [i for i in advcl_head.subtree]
             condition = [i for i in word.subtree]
@@ -393,6 +406,8 @@ def extract_condition_consequence_4(doc):
                 condition_sentence += word.text + ' '
             for word in consequence:
                 consequence_sentence += word.text + ' '
+    print('consequence: ', consequence, 'condition: ', condition, 'condition_sentence: ', condition_sentence, 'consequence_sentence: ', consequence_sentence)
+
     if condition_sentence in consequence_sentence:
         if condition_sentence.find(consequence_sentence) == 0:
             consequence = consequence[0:len(condition)+1]
@@ -434,6 +449,11 @@ def condition_identifier(sentence):
     return False
 
 
+def get_dep_parse(sentence):
+    if 'spacy' not in str(type(sentence)).lower():
+        sentence = sp(sentence)
+    return displacy.render(sentence,style="dep")
+
 ######
 #     # # #####  ###### #      # #    # ######
 #     # # #    # #      #      # ##   # #
@@ -453,7 +473,7 @@ def get_texts(filename):
     temp_list = temp_file.split('\n')
     return temp_list
 
-temp_list = get_texts('raw_data.txt')
+temp_list = get_texts('training_data')
 # %% Make data dict --------------------------------------------------------------------------------
 # Remove unnecesarry characters
 
@@ -465,7 +485,6 @@ def get_only_sentences(temp_list):
     return only_sentences
 
 only_sentences = get_only_sentences(temp_list)
-
 # --------------------------------------------------------------------------------------------------
 # %% Split into single sentences -------------------------------------------------------------------
 
@@ -489,9 +508,9 @@ for el in range(0, len(only_sentences), 2):
 
 # --------------------------------------------------------------------------------------------------
 # Analysis of above dicts -----------------------------------------------------------------------
-list(sentences_nltk['Dataset_1'])
-list(sentences_STNLP['Dataset_1']) # Seems best (clear Segmentation)
-list(sentences_spacy['Dataset_1'])
+# list(sentences_nltk['Dataset_1'])
+# list(sentences_STNLP['Dataset_1']) # Seems best (clear Segmentation)
+# list(sentences_spacy['Dataset_1'])
 
 # --------------------------------------------------------------------------------------------------
 # %% Tokenize sentences ----------------------------------------------------------------------------
@@ -536,11 +555,11 @@ for el in range(0, len(only_sentences), 2):
 
 # --------------------------------------------------------------------------------------------------
 # %% analysis of above dicts -----------------------------------------------------------------------
-print(list(sentences_tokenized_nltk['Dataset_1'])[:5])
-print(list(sentences_tokenized_stNLP['Dataset_1'])[:5])
-print(list(sentences_tokenized_spacy['Dataset_1'])[:5])
-print(list(sentences_tokenized_corenlp['Dataset_1'])[:5]) # Doesn't make separation with "-"
-    # --> There doesn't seem to be a difference, spacy list is a spacy object btw
+# print(list(sentences_tokenized_nltk['Dataset_1'])[:5])
+# print(list(sentences_tokenized_stNLP['Dataset_1'])[:5])
+# print(list(sentences_tokenized_spacy['Dataset_1'])[:5])
+# print(list(sentences_tokenized_corenlp['Dataset_1'])[:5]) # Doesn't make separation with "-"
+#     # --> There doesn't seem to be a difference, spacy list is a spacy object btw
 
 # --------------------------------------------------------------------------------------------------
 # Removing punctuations ----------------------------------------------------------------------------
@@ -589,6 +608,11 @@ for key in sentences_spacy:
             temp_tup_list.append(tuple([word, word.pos_]))
         final_list.append(temp_tup_list)
     sentences_POS_spacy[key] = final_list
+
+def get_pos_tags_spacy(sentence):
+    if 'spacy' not in str(type(sentence)).lower():
+        sentence = sp(sentence)
+    return [(word.text, word.pos_) for word in sentence]
 
 
 # ....... with coreNLP
@@ -645,8 +669,6 @@ pd.concat([df1,df2,df3,df4,df5], axis=1, sort=False)
 # %% Syntactic paring ------------------------------------------------------------------------------
 
 sentence_pos = sentences_POS_stNLP['Dataset_1'][0]
-sentence_normal = sentences_STNLP['Dataset_3'][0]
-sentence_normal
 # ....... with NLTK ----> Intersting to build own grammars
 grammar1 = r"""NP: {<DT><NN>}
                    {<NNP>+}
@@ -672,8 +694,6 @@ corenlp_syn_parse = nlp_wrapper.parse(sentence_normal)
 nlp_wrapper.close()
 
 syn_list = convert_parsed_string_to_list(corenlp_syn_parse) # Get parsed syntax
-
-syn_list
 
 chunk_dict = {} # Get desired chunks
 for chunk in ['ROOT','S', 'NP','VP', 'ADJP', 'SBAR', 'ADVP']:
@@ -713,8 +733,6 @@ with pd.option_context('display.width', None, 'display.max_colwidth', -1):
 nlp = stanfordnlp.Pipeline(processors='tokenize,mwt,pos,lemma,depparse', lang='en')
 sentence = nlp(sentence_normal)
 
-print(*[f"index: {word.index.rjust(2)}\tword: {word.text.ljust(11)}\tgovernor index: {word.governor}\tgovernor: {(doc.sentences[0].words[word.governor-1].text if word.governor > 0 else 'root').ljust(11)}\tdeprel: {word.dependency_relation}" for word in doc.sentences[0].words], sep='\n') # --> Not that good
-
 
 # %% ....... with CoreNLP ----> Gives full parse (dependency)
 sentence_normal = "It is very simple, if the student needs to commute, then the student has right of a permit."
@@ -723,14 +741,13 @@ corenlp_depparse = nlp_wrapper.annotate(sentence_normal, properties={'annotators
 nlp_wrapper.close()
 
 workdoc = json.loads(corenlp_depparse)['sentences']
-workdoc[0]['basicDependencies']
 
 
 # %%....... with spacy -------------------------------------------------------------------------------
 #texts = [only_sentences[3]]
 #text = texts[0]
 #doc = sp(texts)
-doc = sp("It is very simple, if the student needs to commute, then he has right of a permit.")
+doc = sp("A car driver needs to pay a fine of 20 euro if he had an accident.")
 
 # Navigating parse tree
 depparse = {}
@@ -751,33 +768,96 @@ depparse['head_pos'] = head_pos
 depparse['children'] = children
 
 df_temp = pd.DataFrame(depparse)
-df_temp
-
-# %% Main
-for sentence in sentences_spacy['Dataset_3']:
-    print('-----------------------------------------------')
-    print(sentence)
-    temp_doc = sp(str(sentence))
-    print(condition_consequence_extractor(temp_doc))
-    print('-----------------------------------------------')
-
-# %%
-displacy.serve(doc,style="dep")
-
 
 # %% Before continuing, I need other information of the individual sentences since in one senctence, there could be references to the same entity
-neuralcoref.add_to_pipe(sp)
+# neuralcoref.add_to_pipe(sp)
+# corefs = doc._.coref_clusters
 
-# %%
-coref = sp("If the car is blue, it should be washed.")
-print(coref._.coref_clusters)
+# Extraction of seperate elements and their meta information
+# Now begin extracting the actual objects and what their requirements argument
+# For this, I'll need some kind of semantic parsing since it has to do with meaning
 
-# %% Extraction of seperate elements and their meta information
-""""""""""
+# Clean/prepare extracted parts
+###################################################################################################
+doc = sp("A boat needs to be checked if it has an age of 20 years.")
+###################################################################################################
+# Initialize training examples
+cond_cons = condition_consequence_extractor(doc)
+cond = cond_cons['condition']
+cons = cond_cons['consequence']
+only_cond = make_string(cond)
+only_cons = make_string(cons)
+get_dep_parse(only_cond)
 
+# --------------------------------------------------------------------------------------------------
+# %% Conditional statement handler -----------------------------------------------------------------
+# First look at what the sentence handles about -> A person(s) or item(s)?
+"""""""""
+Does it concern multiple items or persons?
+Are there AND/OR statements
 """""""""
 
-condition = condition_consequence_extractor(doc)['condition']
-consequence = condition_consequence_extractor(doc)['consequence']
-condition
-consequence
+# Ex 1: If X is ADJ then ACTION --> So only one object, one condition for object and one action
+
+
+###################################################################################################
+# Functions for extraction of object and its condition
+def get_object_condition(only_cond):
+    # Search for root
+    root = get_root(only_cond)
+
+    object_or_person = []
+    condition = []
+    for sub in root.subtree:
+        if sub.dep_ in ['nsubj', 'nsubjpass']:
+            object_or_person.append([el for el in sub.subtree])
+        elif sub.dep_ in ['acomp', 'attr', 'dobj', 'neg', 'prep']:
+            condition.append([el for el in sub.subtree])
+    condition = clean_condition_low_level(condition)
+    return {'object_or_person': flatten(object_or_person), 'condition': flatten(condition), 'binder': (root, root.lemma_)}
+def get_root(doc):
+    return [el for el in doc if el.dep_=='ROOT'][0]
+def clean_condition_low_level(condition):
+    output = []
+    not_in_output = False
+    # Check for negations
+    for el in condition:
+        for i in el:
+            if i.text in 'not':
+                output.append(i)
+                not_in_output = True
+    if len(condition) >= 2 and not_in_output:
+        output.append(condition[1])
+    elif len(condition) >= 2 and not not_in_output:
+        output.append(condition[0])
+    elif len(condition) == 1:
+        output.append(condition)
+    return output
+def flatten(nested_list):
+    flat_list = []
+    for sublist in nested_list:
+        if type(sublist) == list:
+            for item in sublist:
+                flat_list.append(item)
+        else:
+            flat_list.append(sublist)
+    for el in flat_list:
+        if type(el) == list:
+            return flatten(flat_list)
+    return flat_list
+def make_string(words_list):
+    return sp(' '.join([word.text for word in words_list]))
+def get_ners(spacydoc):
+    return [(x.text, x.label_) for x in spacydoc.ents]
+###################################################################################################
+
+
+
+# --------------------------------------------------------------------------------------------------
+# %% consequence stements handler ------------------------------------------------------------------
+# Then look at what condition the item/person should be in
+
+
+#
+for el in cond_cons['condition']:
+    print(el.lemma_)
