@@ -226,6 +226,37 @@ def output_empty(output):
     else:
         return False
 
+
+def make_string(words_list):
+    return sp(' '.join([word.text for word in words_list]))
+
+
+def get_dep_parse(sentence):
+    if 'spacy' not in str(type(sentence)).lower():
+        sentence = sp(sentence)
+    return displacy.render(sentence,style="dep")
+
+
+def get_token_children(token):
+    if token.is_sent_start:
+        return token
+    else:
+        return token, [get_token_children(child) for child in token.children]
+
+
+def remove_duplicate_chunks(words_list):
+    temp_index_list = []
+    output = []
+    for word in words_list:
+        temp_index_list.append(word.idx)
+    idx_uniques = list(dict.fromkeys(temp_index_list))
+    for i in words_list:
+        if i.idx in idx_uniques:
+            output.append(i)
+            idx_uniques.remove(i.idx)
+    return output
+
+
 # The magic stuff (for now)
 
  ####   ####  #    # #####  # ##### #  ####  #    #
@@ -244,7 +275,7 @@ def output_empty(output):
 ###### #    #   #   #    # #    #  ####    #    ####  #    #  ####
 
 
-def condition_and_consequence_together(cond,cons):
+def get_distinct_sentences(cond,cons):
     condition_sentence = ''
     consequence_sentence = ''
     for word in cond:
@@ -257,21 +288,47 @@ def condition_and_consequence_together(cond,cons):
     elif consequence_sentence in condition_sentence:
         # Shorten condition part
         cond = remove_wrong_part(cons, cond)
-    return {'condition': cond, 'consequence': cons}
+    return [cond, cons]
 
 
 def remove_wrong_part(companion, list_to_shorten):
+    if 'list' not in str(type(list_to_shorten)):
+        list_to_shorten = get_tokens_spacy(list_to_shorten)
+    if 'list' not in str(type(companion)):
+        companion = get_tokens_spacy(companion)
     companion_idx = [i.idx for i in companion]
     pop_list = []
     for i in range(0, len(list_to_shorten)):
         if list_to_shorten[i].idx in companion_idx:
             pop_list.append(i)
+
+    # Last new part that was added to avoid error
+    # Original:
+    """""""""""
+    def remove_wrong_part(companion, list_to_shorten):
+        companion_idx = [i.idx for i in companion]
+        pop_list = []
+        for i in range(0, len(list_to_shorten)):
+            if list_to_shorten[i].idx in companion_idx:
+                pop_list.append(i)
+
+        for i in sorted(pop_list, reverse=True):
+            del list_to_shorten[i]
+        return list_to_shorten
+    """""""""""
     for i in sorted(pop_list, reverse=True):
         del list_to_shorten[i]
     return list_to_shorten
 
 
 def condition_consequence_extractor(doc):
+    """""""""
+    Temporary solution for problem of inaccurate cond-cons prediction
+    """""""""
+    doc = sp(lookup_replace_if_synonyms(str(doc)))
+    """""""""
+    Temporary solution for problem of inaccurate cond-cons prediction
+    """""""""
     # First check whether there is a conditional statement in the sentence
     if condition_identifier(doc.text):
         try:
@@ -282,13 +339,45 @@ def condition_consequence_extractor(doc):
         if output_empty(output):
             output = extract_condition_consequence_3(doc)
         # Last part added to check whether cond and cons are together in output (bad)
-        #if condition_and_consequence_together(output['condition'], output['consequence']):
+        #if get_distinct_sentences(output['condition'], output['consequence']):
         #    output = extract_condition_consequence_4(doc)
         output = {'condition': remove_duplicate_chunks(output['condition']), 'consequence': remove_duplicate_chunks(output['consequence'])}
-        output = condition_and_consequence_together(output['condition'], output['consequence'])
+        disctinct_sentences = get_distinct_sentences(output['condition'], output['consequence'])
+        output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
+
         return output
     else:
         return 'No conditional statement in sentence'
+
+# Drastic times call for drastic measures, I want to replace all IF synonyms in a sentence to If. This is because its synonyms often cause problems. Namely, the synonyms don't have one simple pos tag or dependency tag.
+
+def lookup_replace_if_synonyms(text):
+    if 'spacy' in str(type(text)):
+        text = str(text)
+    if_then_synonyms_words = ['whenever', 'wherever']
+    if_then_synonyms_phrase = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
+    for sentence_word in nltk.word_tokenize(text):
+        for wordphrase in if_then_synonyms_phrase:
+            if wordphrase in text.lower():
+                indices_to_replace = find_word_indices_string(text, wordphrase)
+                return replace_sentence_part_by_index(text, indices_to_replace)
+            else:
+                if sentence_word.lower() in if_then_synonyms_words:
+                    indices_to_replace = find_word_indices_string(text, sentence_word)
+                    return replace_sentence_part_by_index(text, indices_to_replace)
+    return text
+
+
+def find_word_indices_string(sentence, word):
+    return sentence.lower().find(word), sentence.lower().find(word)+len(word)
+
+
+def replace_sentence_part_by_index(text, indices_to_replace):
+    # If first is 0, means word is in beginning of sentence
+    if indices_to_replace[0] == 0:
+        return 'If ' + text[indices_to_replace[1]:]
+    else:
+        return text[:indices_to_replace[0]] + 'if ' + text[indices_to_replace[1]:]
 
 
 def extract_condition_consequence_1(doc):
@@ -406,7 +495,6 @@ def extract_condition_consequence_4(doc):
                 condition_sentence += word.text + ' '
             for word in consequence:
                 consequence_sentence += word.text + ' '
-    print('consequence: ', consequence, 'condition: ', condition, 'condition_sentence: ', condition_sentence, 'consequence_sentence: ', consequence_sentence)
 
     if condition_sentence in consequence_sentence:
         if condition_sentence.find(consequence_sentence) == 0:
@@ -415,25 +503,6 @@ def extract_condition_consequence_4(doc):
             consequence = consequence[consequence.index(condition[-1])+1:]
     return {'condition': condition, 'consequence': consequence}
 
-
-def remove_duplicate_chunks(words_list):
-    temp_index_list = []
-    output = []
-    for word in words_list:
-        temp_index_list.append(word.idx)
-    idx_uniques = list(dict.fromkeys(temp_index_list))
-    for i in words_list:
-        if i.idx in idx_uniques:
-            output.append(i)
-            idx_uniques.remove(i.idx)
-    return output
-
-
-def get_token_children(token):
-    if token.is_sent_start:
-        return token
-    else:
-        return token, [get_token_children(child) for child in token.children]
 
 def condition_identifier(sentence):
     if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
@@ -448,11 +517,6 @@ def condition_identifier(sentence):
                     return True
     return False
 
-
-def get_dep_parse(sentence):
-    if 'spacy' not in str(type(sentence)).lower():
-        sentence = sp(sentence)
-    return displacy.render(sentence,style="dep")
 
 ######
 #     # # #####  ###### #      # #    # ######
@@ -473,7 +537,7 @@ def get_texts(filename):
     temp_list = temp_file.split('\n')
     return temp_list
 
-temp_list = get_texts('training_data')
+temp_list = get_texts('raw_data.txt')
 # %% Make data dict --------------------------------------------------------------------------------
 # Remove unnecesarry characters
 
@@ -499,13 +563,16 @@ for el in range(0, len(only_sentences), 2):
     sentences_STNLP[only_sentences[el]] = sent_tokenize_stnlp(only_sentences[el+1])
 
 # ....... with spaCy
-sentences_spacy = {}
-for el in range(0, len(only_sentences), 2):
-    temp_list = []
-    for sentence in sp(only_sentences[el+1]).sents:
-        temp_list.append(sentence)
-    sentences_spacy[only_sentences[el]] = temp_list
+def get_spacy_lib(only_sentences):
+    sentences_spacy = {}
+    for el in range(0, len(only_sentences), 2):
+        temp_list = []
+        for sentence in sp(only_sentences[el+1]).sents:
+            temp_list.append(sentence)
+        sentences_spacy[only_sentences[el]] = temp_list
+    return sentences_spacy
 
+sentences_spacy = get_spacy_lib(only_sentences)
 # --------------------------------------------------------------------------------------------------
 # Analysis of above dicts -----------------------------------------------------------------------
 # list(sentences_nltk['Dataset_1'])
@@ -547,6 +614,11 @@ for key in sentences_spacy:
         temp_list.append(temp_list_2)
     sentences_tokenized_spacy[key] = temp_list
 
+
+def get_tokens_spacy(sentence):
+    if 'spacy' not in str(type(sentence)):
+        sentence = sp(sentence)
+    return [word for word in sentence]
 
 # ....... with coreNLP
 sentences_tokenized_corenlp = {}
@@ -743,7 +815,7 @@ nlp_wrapper.close()
 workdoc = json.loads(corenlp_depparse)['sentences']
 
 
-# %%....... with spacy -------------------------------------------------------------------------------
+# %%....... with spacy -----------------------------------------------------------------------------
 #texts = [only_sentences[3]]
 #text = texts[0]
 #doc = sp(texts)
@@ -779,57 +851,56 @@ df_temp = pd.DataFrame(depparse)
 
 # Clean/prepare extracted parts
 ###################################################################################################
-doc = sp("A boat needs to be checked if it has an age of 20 years.")
-###################################################################################################
-# Initialize training examples
-cond_cons = condition_consequence_extractor(doc)
-cond = cond_cons['condition']
-cons = cond_cons['consequence']
-only_cond = make_string(cond)
-only_cons = make_string(cons)
-get_dep_parse(only_cond)
-
-# --------------------------------------------------------------------------------------------------
-# %% Conditional statement handler -----------------------------------------------------------------
+# %% Conditional statement handler ################################################################
 # First look at what the sentence handles about -> A person(s) or item(s)?
 """""""""
 Does it concern multiple items or persons?
 Are there AND/OR statements
 """""""""
 
-# Ex 1: If X is ADJ then ACTION --> So only one object, one condition for object and one action
+# --------------------------------------------------------------------------------------------------
+# Ex 1: If A then ACTION --> So only one object, one condition for object and one action
+doc = sp("A boat needs to be checked if it hasn't an age of 20 years.")
+cond_cons = condition_consequence_extractor(doc)
+get_lower_level_cond(cond_cons['condition'])
+get_lower_level_cons(cond_cons['consequence'])
+
+# --------------------------------------------------------------------------------------------------
+# Ex 2: If A and B then ACTION / If A or B then ACTION (SAME DEPENDENCY STRUCTURE FOR AND AND OR)
+
+# I need to be able to search for synonyms of "no", "and" and "or"
+doc = sp("If the person is between 22 and 29 years of age, and was involved in a car accident, insurance cost is 600 euros.")
+cond_cons = condition_consequence_extractor(doc)
+get_lower_level_cond(cond_cons['condition'])
 
 
 ###################################################################################################
 # Functions for extraction of object and its condition
-def get_object_condition(only_cond):
-    # Search for root
-    root = get_root(only_cond)
-
-    object_or_person = []
-    condition = []
-    for sub in root.subtree:
-        if sub.dep_ in ['nsubj', 'nsubjpass']:
-            object_or_person.append([el for el in sub.subtree])
-        elif sub.dep_ in ['acomp', 'attr', 'dobj', 'neg', 'prep']:
-            condition.append([el for el in sub.subtree])
-    condition = clean_condition_low_level(condition)
-    return {'object_or_person': flatten(object_or_person), 'condition': flatten(condition), 'binder': (root, root.lemma_)}
 def get_root(doc):
     return [el for el in doc if el.dep_=='ROOT'][0]
-def clean_condition_low_level(condition):
+def clean_low_level(condition):
     output = []
     not_in_output = False
     # Check for negations
     for el in condition:
         for i in el:
-            if i.text in 'not':
+            if i.text in 'not' or i.text in "n't":
                 output.append(i)
                 not_in_output = True
+    # Clean condition part from if statements
+    if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
+    if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ']
+    pop_list = []
+    for i in range(0, len(condition)):
+        for word in condition[i]:
+            if word.text.lower() in if_then_synonyms_words or word.text.lower() in if_then_synonyms_phrase:
+                pop_list.append(i)
+    for i in sorted(pop_list, reverse=True):
+        del condition[i]
     if len(condition) >= 2 and not_in_output:
-        output.append(condition[1])
+        output.append(condition[1:])
     elif len(condition) >= 2 and not not_in_output:
-        output.append(condition[0])
+        output.append(condition[0:])
     elif len(condition) == 1:
         output.append(condition)
     return output
@@ -845,19 +916,156 @@ def flatten(nested_list):
         if type(el) == list:
             return flatten(flat_list)
     return flat_list
-def make_string(words_list):
-    return sp(' '.join([word.text for word in words_list]))
 def get_ners(spacydoc):
     return [(x.text, x.label_) for x in spacydoc.ents]
+def sent_splitter(sent, dep_tags_split):
+    parts = []
+    for word in sent:
+        if word.dep_ == dep_tags_split and word.head.pos_ in ['AUX', 'VERB']:
+            parts.append([token for token in word.subtree])
+    distinct_parts = []
+    # Make list of sent constituent parts
+    for part in parts:
+        distinct_parts.append(part)
+    # Get full and string
+    full_and_string = []
+    for part in parts:
+        [full_and_string.append(word) for word in part]
+    distinct_parts.insert(0,get_distinct_sentences(sent, full_and_string)[0])# Get first part sentence
+    return distinct_parts
+# ==================================================================================================
+# Functions to extract binary conditions
+def get_lower_level_cond(only_cond):
+    only_cond_string = make_string(only_cond)
+    # Search for root
+    root = get_root(only_cond_string)
+    object_or_person = []
+    condition = []
+    binary_classifier = []
+    # Search for binary binary_classifier AND/OR
+    for word in only_cond_string:
+        if word.pos_ == 'CCONJ' and word.dep_ == 'cc' and word.head.pos_ in ['AUX', 'VERB']:
+            binary_classifier.append(word)
+
+    # Search for objects and conditions in the form of {cond1:{'object/person', 'cond', 'binder'}, cond2...}
+    distinct_parts = sent_splitter(only_cond, 'conj')
+    conds = {'conds':[]}
+    i = 1
+    for distinct in distinct_parts:
+        # Check if there's a verb in the distinct
+        conds['conds'].append({f'cond {i}': get_object_condition(distinct)})
+        i += 1
+    if binary_classifier == []:
+        binary_classifier = None
+    return [conds, {'conjs': binary_classifier}]
+def get_object_condition(only_cond):
+    only_cond = make_string(only_cond)
+    # Search for root
+    root = get_root(only_cond)
+    object_or_person = []
+    condition = []
+    for sub in root.subtree:
+        if sub.dep_ in ['nsubj', 'nsubjpass']:
+            object_or_person.append([el for el in sub.subtree])
+        elif sub.dep_ in ['acomp', 'attr', 'dobj', 'neg', 'prep', 'advmod']:
+            condition.append([el for el in sub.subtree])
+    condition = flatten(clean_low_level(condition))
+    condition = remove_duplicate_chunks(condition)
+    return {'object_or_person': flatten(object_or_person), 'condition': condition, 'binder': (root, root.lemma_)}
+###################################################################################################
+
+
+# --------------------------------------------------------------------------------------------------
+# %% consequence staments handler ------------------------------------------------------------------
+# Then look at what condition the item/person should be in
+doc = sp("A boat needs to be checked if it hasn't an age of 20 years.")
+cond_cons = condition_consequence_extractor(doc)
+only_cons = make_string(cond_cons['consequence'])
+get_dep_parse(only_cons)
+get_lower_level_cons(cond_cons['consequence'])
+
+###################################################################################################
+# Functions for extraction of object and its consequence
+def get_lower_level_cons(only_cons):
+    only_cons_string = make_string(only_cons)
+    # Search for root
+    object_or_person = []
+    consequence = []
+    binary_classifier = []
+
+    # Search for binary binary_classifier AND/OR
+    for word in only_cons_string:
+        if word.pos_ == 'CCONJ' and word.dep_ == 'cc' and word.head.pos_ in ['AUX', 'VERB']:
+            binary_classifier.append(word)
+
+    # Search for objects and conditions in the form of {cond1:{'object/person', 'cons', 'binder'}, cond2...}
+    distinct_parts = sent_splitter(only_cons, 'conj')
+    cons = {'cons':[]}
+    i = 1
+    for distinct in distinct_parts:
+        # Check if there's a verb in the distinct
+        cons['cons'].append({f'cond {i}': get_object_consequence(distinct)})
+        i += 1
+    if binary_classifier == []:
+        binary_classifier = None
+    return [cons, {'conjs': binary_classifier}]
+def get_object_consequence(consequence):
+        only_cons = make_string(consequence)
+        # Search for root
+        root = get_root(only_cons)
+        object_or_person = []
+        consequence = []
+        for sub in root.subtree:
+            if sub.dep_ in ['nsubj']:
+                object_or_person.append([el for el in sub.subtree])
+            elif sub.dep_ in ['xcomp']:
+                consequence.append([el for el in sub.subtree])
+        consequence = flatten(clean_low_level(consequence))
+        consequence = remove_duplicate_chunks(consequence)
+        return {'object_or_person': flatten(object_or_person), 'consequence': consequence, 'binder': (root, root.lemma_)}
 ###################################################################################################
 
 
 
-# --------------------------------------------------------------------------------------------------
-# %% consequence stements handler ------------------------------------------------------------------
-# Then look at what condition the item/person should be in
 
 
-#
-for el in cond_cons['condition']:
-    print(el.lemma_)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+temp_set = ['The car needs to be washed if it is blue.', 'The student needs to pay 30 euro if he is 21 years old.', 'If he had an accident, the car driver needs to pay 30 euro.']
+
+# sentences_spacy['Dataset_1']
+# Test:
+for sentence in sentences_spacy['Dataset_2']:
+    print('--------------- NEXT SENTENCE -----------------')
+    print(sentence)
+    temp_doc = sp(str(sentence))
+    cond_cons = condition_consequence_extractor(temp_doc)
+    if cond_cons != 'No conditional statement in sentence':
+        cond = cond_cons['condition']
+        cons = cond_cons['consequence']
+        only_cond = make_string(cond)
+        only_cons = make_string(cons)
+        print('High level rule: ', cond_cons)
+        obj_cond = get_lower_level_cond(only_cond)
+        print('Lower level conditional: ', obj_cond)
+    else:
+        print(cond_cons)
+    print('-----------------------------------------------')
