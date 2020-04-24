@@ -325,7 +325,7 @@ def condition_consequence_extractor(doc):
     """""""""
     Temporary solution for problem of inaccurate cond-cons prediction
     """""""""
-    doc = sp(lookup_replace_if_synonyms(str(doc)))
+    #doc = sp(lookup_replace_if_synonyms(str(doc)))
     """""""""
     Temporary solution for problem of inaccurate cond-cons prediction
     """""""""
@@ -390,7 +390,7 @@ def extract_condition_consequence_1(doc):
             before =[]
             after = []
             for child in token.children:
-                if child.dep_ != 'advcl' and child.dep_ != 'prep' and child.dep_ != 'advmod':
+                if child.dep_ != 'advcl' and child.dep_ != 'advmod': # and child.dep_ != 'prep'
                     if child.idx < token.idx:
                         # Append everything before root
                         [before.append(i) for i in child.subtree]
@@ -978,8 +978,9 @@ def get_object_condition(only_cond):
 # --------------------------------------------------------------------------------------------------
 # %% consequence staments handler ------------------------------------------------------------------
 # Then look at what condition the item/person should be in
-doc = sp("A boat needs to be checked if it hasn't an age of 20 years.")
+doc = sp("In case that a person is between 19 and 21 years old and was not involved in a car accident, car insurance costs 500 euros.")
 cond_cons = condition_consequence_extractor(doc)
+
 only_cons = make_string(cond_cons['consequence'])
 get_dep_parse(only_cons)
 get_lower_level_cons(cond_cons['consequence'])
@@ -1004,7 +1005,7 @@ def get_lower_level_cons(only_cons):
     i = 1
     for distinct in distinct_parts:
         # Check if there's a verb in the distinct
-        cons['cons'].append({f'cond {i}': get_object_consequence(distinct)})
+        cons['cons'].append({f'cons {i}': get_object_consequence(distinct)})
         i += 1
     if binary_classifier == []:
         binary_classifier = None
@@ -1016,44 +1017,71 @@ def get_object_consequence(consequence):
         object_or_person = []
         consequence = []
         for sub in root.subtree:
-            if sub.dep_ in ['nsubj']:
+            if sub.dep_ in ['nsubj', 'nsubjpass']:
                 object_or_person.append([el for el in sub.subtree])
-            elif sub.dep_ in ['xcomp']:
+            elif sub.dep_ in ['xcomp', 'prep', 'attr', 'dobj', 'npadvmod']:
                 consequence.append([el for el in sub.subtree])
         consequence = flatten(clean_low_level(consequence))
         consequence = remove_duplicate_chunks(consequence)
         return {'object_or_person': flatten(object_or_person), 'consequence': consequence, 'binder': (root, root.lemma_)}
 ###################################################################################################
 
+# All key elements in place, now last representation of the rules
+doc = sp("If the service request is a product change, the customer is charged 50 euro.")
+cond_cons = condition_consequence_extractor(doc)
 
+low_cond = get_lower_level_cond(cond_cons['condition'])
+low_cons = get_lower_level_cons(cond_cons['consequence'])
 
+get_rule(low_cond, low_cons)
 
+def get_rule(low_cond, low_cons):
+    # If there are more than 1 conds or cons, this means there's a conj
+    sentence_rule = []
+    objects_or_persons = []
+    conjs = []
+    conditions = []
+    links = []
 
+    for condition in low_cond[0]['conds']:
+        for el in condition:
+            objects_or_persons.append(condition[el]['object_or_person'])
+            conditions.append(condition[el]['condition'])
+            links.append(condition[el]['binder'])
+    conjs.append(low_cond[1]['conjs'])
 
+    sentence_rule.append(objects_or_persons)
+    sentence_rule.append(links)
+    sentence_rule.append(conditions)
+    sentence_rule.append(conjs)
+    sentence_rule.append('-->')
 
+    objects_or_persons = []
+    conjs = []
+    consequences = []
+    links = []
 
+    for consequence in low_cons[0]['cons']:
+        for el in consequence:
+            objects_or_persons.append(consequence[el]['object_or_person'])
+            consequences.append(consequence[el]['consequence'])
+            links.append(consequence[el]['binder'])
+    conjs.append(low_cons[1]['conjs'])
 
+    sentence_rule.append(objects_or_persons)
+    sentence_rule.append(links)
+    sentence_rule.append(consequences)
+    sentence_rule.append(conjs)
 
+    return sentence_rule
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+###################################################################################################
+###################################################################################################
 temp_set = ['The car needs to be washed if it is blue.', 'The student needs to pay 30 euro if he is 21 years old.', 'If he had an accident, the car driver needs to pay 30 euro.']
 
 # sentences_spacy['Dataset_1']
 # Test:
-for sentence in sentences_spacy['Dataset_2']:
+for sentence in sentences_spacy['Dataset_1']:
     print('--------------- NEXT SENTENCE -----------------')
     print(sentence)
     temp_doc = sp(str(sentence))
@@ -1066,6 +1094,8 @@ for sentence in sentences_spacy['Dataset_2']:
         print('High level rule: ', cond_cons)
         obj_cond = get_lower_level_cond(only_cond)
         print('Lower level conditional: ', obj_cond)
+        obj_cons = get_lower_level_cons(only_cons)
+        print('Lower level consequence: ', obj_cons)
     else:
         print(cond_cons)
     print('-----------------------------------------------')
