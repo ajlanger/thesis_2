@@ -62,13 +62,28 @@ dep_dict = {
 # --------------------------------------------------------------------------------------------------
 # %% Functions -------------------------------------------------------------------------------------
 
-#     #
-#     # ###### #      #####     ###### #    # #    #  ####  ##### #  ####  #    #  ####
-#     # #      #      #    #    #      #    # ##   # #    #   #   # #    # ##   # #
-####### #####  #      #    #    #####  #    # # #  # #        #   # #    # # #  #  ####
-#     # #      #      #####     #      #    # #  # # #        #   # #    # #  # #      #
-#     # #      #      #         #      #    # #   ## #    #   #   # #    # #   ## #    #
-#     # ###### ###### #         #       ####  #    #  ####    #   #  ####  #    #  ####
+
+# ███████ ██    ██ ██████  ██████   ██████  ██████  ████████
+# ██      ██    ██ ██   ██ ██   ██ ██    ██ ██   ██    ██
+# ███████ ██    ██ ██████  ██████  ██    ██ ██████     ██
+#      ██ ██    ██ ██      ██      ██    ██ ██   ██    ██
+# ███████  ██████  ██      ██       ██████  ██   ██    ██
+
+
+
+# ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████
+# ██      ██    ██ ████   ██ ██         ██    ██ ██    ██ ████   ██ ██
+# █████   ██    ██ ██ ██  ██ ██         ██    ██ ██    ██ ██ ██  ██ ███████
+# ██      ██    ██ ██  ██ ██ ██         ██    ██ ██    ██ ██  ██ ██      ██
+# ██       ██████  ██   ████  ██████    ██    ██  ██████  ██   ████ ███████
+
+
+def get_texts(filename):
+    filename = filename
+    temp_file = open(filename, 'r').read()
+    temp_list = temp_file.split('\n')
+    return temp_list
+
 
 def sent_tokenize_stnlp(paragraph):
     output = []
@@ -257,24 +272,6 @@ def remove_duplicate_chunks(words_list):
     return output
 
 
-# The magic stuff (for now)
-
- ####   ####  #    # #####  # ##### #  ####  #    #
-#    # #    # ##   # #    # #   #   # #    # ##   #
-#      #    # # #  # #    # #   #   # #    # # #  #
-#      #    # #  # # #    # #   #   # #    # #  # #
-#    # #    # #   ## #    # #   #   # #    # #   ##
- ####   ####  #    # #####  #   #   #  ####  #    #
-
-
-###### #    # ##### #####    ##    ####  #####  ####  #####   ####
-#       #  #    #   #    #  #  #  #    #   #   #    # #    # #
-#####    ##     #   #    # #    # #        #   #    # #    #  ####
-#        ##     #   #####  ###### #        #   #    # #####       #
-#       #  #    #   #   #  #    # #    #   #   #    # #   #  #    #
-###### #    #   #   #    # #    #  ####    #    ####  #    #  ####
-
-
 def get_distinct_sentences(cond,cons):
     condition_sentence = ''
     consequence_sentence = ''
@@ -320,6 +317,87 @@ def remove_wrong_part(companion, list_to_shorten):
         del list_to_shorten[i]
     return list_to_shorten
 
+
+def get_only_sentences(temp_list):
+    only_sentences = []
+    for sentence in temp_list:
+        if sentence != '':
+            only_sentences.append(sentence)
+    return only_sentences
+
+
+def get_pos_tags_spacy(sentence):
+    if 'spacy' not in str(type(sentence)).lower():
+        sentence = sp(sentence)
+    return [(word.text, word.pos_) for word in sentence]
+
+
+def get_tokens_spacy(sentence):
+    if 'spacy' not in str(type(sentence)):
+        sentence = sp(sentence)
+    return [word for word in sentence]
+
+
+def nltk_POS_tag(tokenized_dict):
+    nltk_pos = {}
+    for key in tokenized_dict:
+        temp_list = []
+        for sentence in tokenized_dict[key]:
+            temp_list.append(nltk.pos_tag(sentence))
+        nltk_pos[key] = temp_list
+    return nltk_pos
+
+
+def get_spacy_lib(only_sentences):
+    sentences_spacy = {}
+    for el in range(0, len(only_sentences), 2):
+        temp_list = []
+        for sentence in sp(only_sentences[el+1]).sents:
+            temp_list.append(sentence)
+        sentences_spacy[only_sentences[el]] = temp_list
+    return sentences_spacy
+
+
+def get_dep_df(doc):
+    # Navigating parse tree
+    depparse = {}
+    text, dep, head_text, head_pos, children = ([] for i in range(5)) # Initialize lists
+    for token in doc:
+        text.append(token.text), dep.append(token.dep_), head_text.append(token.head.text), head_pos.append(token.head.pos_),children.append([child for child in token.children])
+
+    temp_list = []
+    for i in range(len(text)):
+        temp_list.append((text[i],dep[i]))
+    temp_dict = extract_pos_info(temp_list,dep_dict)
+
+    depparse['text'] = text
+    depparse['dep'] = dep
+    depparse['exp'] = temp_dict['exp']
+    depparse['head_text'] = head_text
+    depparse['head_pos'] = head_pos
+    depparse['children'] = children
+
+    df_temp = pd.DataFrame(depparse)
+    return df_temp
+
+
+#  ██████  ██████  ███    ██ ██████  ██ ████████ ██  ██████  ███    ██
+# ██      ██    ██ ████   ██ ██   ██ ██    ██    ██ ██    ██ ████   ██
+# ██      ██    ██ ██ ██  ██ ██   ██ ██    ██    ██ ██    ██ ██ ██  ██
+# ██      ██    ██ ██  ██ ██ ██   ██ ██    ██    ██ ██    ██ ██  ██ ██
+#  ██████  ██████  ██   ████ ██████  ██    ██    ██  ██████  ██   ████
+
+# ███████ ██   ██ ████████ ██████   █████   ██████ ████████  ██████  ██████  ███████
+# ██       ██ ██     ██    ██   ██ ██   ██ ██         ██    ██    ██ ██   ██ ██
+# █████     ███      ██    ██████  ███████ ██         ██    ██    ██ ██████  ███████
+# ██       ██ ██     ██    ██   ██ ██   ██ ██         ██    ██    ██ ██   ██      ██
+# ███████ ██   ██    ██    ██   ██ ██   ██  ██████    ██     ██████  ██   ██ ███████
+
+# ██   ██ ██  ██████  ██   ██     ██      ███████ ██    ██ ███████ ██
+# ██   ██ ██ ██       ██   ██     ██      ██      ██    ██ ██      ██
+# ███████ ██ ██   ███ ███████     ██      █████   ██    ██ █████   ██
+# ██   ██ ██ ██    ██ ██   ██     ██      ██       ██  ██  ██      ██
+# ██   ██ ██  ██████  ██   ██     ███████ ███████   ████   ███████ ███████
 
 def condition_consequence_extractor(doc):
     """""""""
@@ -518,35 +596,203 @@ def condition_identifier(sentence):
     return False
 
 
-######
-#     # # #####  ###### #      # #    # ######
-#     # # #    # #      #      # ##   # #
-######  # #    # #####  #      # # #  # #####
-#       # #####  #      #      # #  # # #
-#       # #      #      #      # #   ## #
-#       # #      ###### ###### # #    # ######
+    #  ██████  ██████  ███    ██ ██████  ██ ████████ ██  ██████  ███    ██
+    # ██      ██    ██ ████   ██ ██   ██ ██    ██    ██ ██    ██ ████   ██
+    # ██      ██    ██ ██ ██  ██ ██   ██ ██    ██    ██ ██    ██ ██ ██  ██
+    # ██      ██    ██ ██  ██ ██ ██   ██ ██    ██    ██ ██    ██ ██  ██ ██
+    #  ██████  ██████  ██   ████ ██████  ██    ██    ██  ██████  ██   ████
+
+    # ███████ ██   ██ ████████ ██████   █████   ██████ ████████  ██████  ██████
+    # ██       ██ ██     ██    ██   ██ ██   ██ ██         ██    ██    ██ ██   ██
+    # █████     ███      ██    ██████  ███████ ██         ██    ██    ██ ██████
+    # ██       ██ ██     ██    ██   ██ ██   ██ ██         ██    ██    ██ ██   ██
+    # ███████ ██   ██    ██    ██   ██ ██   ██  ██████    ██     ██████  ██   ██
+
+    # ██       ██████  ██     ██     ██      ███████ ██    ██ ███████ ██
+    # ██      ██    ██ ██     ██     ██      ██      ██    ██ ██      ██
+    # ██      ██    ██ ██  █  ██     ██      █████   ██    ██ █████   ██
+    # ██      ██    ██ ██ ███ ██     ██      ██       ██  ██  ██      ██
+    # ███████  ██████   ███ ███      ███████ ███████   ████   ███████ ███████
+
+
+###################################################################################################
+# Functions for extraction of object and its condition
+def get_root(doc):
+    return [el for el in doc if el.dep_=='ROOT'][0]
+
+
+def clean_low_level(condition):
+    output = []
+    not_in_output = False
+    # Check for negations
+    for el in condition:
+        for i in el:
+            if i.text in 'not' or i.text in "n't":
+                output.append(i)
+                not_in_output = True
+    # Clean condition part from if statements
+    if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
+    if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ']
+    pop_list = []
+    for i in range(0, len(condition)):
+        for word in condition[i]:
+            if word.text.lower() in if_then_synonyms_words or word.text.lower() in if_then_synonyms_phrase:
+                pop_list.append(i)
+    for i in sorted(pop_list, reverse=True):
+        del condition[i]
+    if len(condition) >= 2 and not_in_output:
+        output.append(condition[1:])
+    elif len(condition) >= 2 and not not_in_output:
+        output.append(condition[0:])
+    elif len(condition) == 1:
+        output.append(condition)
+    return output
+
+
+def flatten(nested_list):
+    flat_list = []
+    for sublist in nested_list:
+        if type(sublist) == list:
+            for item in sublist:
+                flat_list.append(item)
+        else:
+            flat_list.append(sublist)
+    for el in flat_list:
+        if type(el) == list:
+            return flatten(flat_list)
+    return flat_list
+
+
+def get_ners(spacydoc):
+    return [(x.text, x.label_) for x in spacydoc.ents]
+
+
+def sent_splitter(sent, dep_tags_split):
+    parts = []
+    for word in sent:
+        if word.dep_ == dep_tags_split and word.head.pos_ in ['AUX', 'VERB']:
+            parts.append([token for token in word.subtree])
+    distinct_parts = []
+    # Make list of sent constituent parts
+    for part in parts:
+        distinct_parts.append(part)
+    # Get full and string
+    full_and_string = []
+    for part in parts:
+        [full_and_string.append(word) for word in part]
+    distinct_parts.insert(0,get_distinct_sentences(sent, full_and_string)[0])# Get first part sentence
+    return distinct_parts
+# ==================================================================================================
+# Functions to extract binary conditions
+def get_lower_level_cond(only_cond):
+    only_cond_string = make_string(only_cond)
+    # Search for root
+    root = get_root(only_cond_string)
+    object_or_person = []
+    condition = []
+    binary_classifier = []
+    # Search for binary binary_classifier AND/OR
+    for word in only_cond_string:
+        if word.pos_ == 'CCONJ' and word.dep_ == 'cc' and word.head.pos_ in ['AUX', 'VERB']:
+            binary_classifier.append(word)
+
+    # Search for objects and conditions in the form of {cond1:{'object/person', 'cond', 'binder'}, cond2...}
+    distinct_parts = sent_splitter(only_cond, 'conj')
+    conds = {'conds':[]}
+    i = 1
+    for distinct in distinct_parts:
+        # Check if there's a verb in the distinct
+        conds['conds'].append({f'C{i}': get_object_condition(distinct)})
+        i += 1
+    if binary_classifier == []:
+        binary_classifier = None
+
+    conds['conjs'] = binary_classifier
+    #return [conds, {'conjs': binary_classifier}]
+    return conds
+
+
+def get_object_condition(only_cond):
+    only_cond = make_string(only_cond)
+    # Search for root
+    root = get_root(only_cond)
+    object_or_person = []
+    condition = []
+    for sub in root.subtree:
+        if sub.dep_ in ['nsubj', 'nsubjpass']:
+            object_or_person.append([el for el in sub.subtree])
+        elif sub.dep_ in ['acomp', 'attr', 'dobj', 'neg', 'prep', 'advmod']:
+            condition.append([el for el in sub.subtree])
+    condition = flatten(clean_low_level(condition))
+    condition = remove_duplicate_chunks(condition)
+    return {'object_or_person': flatten(object_or_person), 'c': condition, 'binder': (root, root.lemma_)}
+###################################################################################################
+###################################################################################################
+# Functions for extraction of object and its consequence
+def get_lower_level_cons(only_cons):
+    only_cons_string = make_string(only_cons)
+    # Search for root
+    object_or_person = []
+    consequence = []
+    binary_classifier = []
+
+    # Search for binary binary_classifier AND/OR
+    for word in only_cons_string:
+        if word.pos_ == 'CCONJ' and word.dep_ == 'cc' and word.head.pos_ in ['AUX', 'VERB']:
+            binary_classifier.append(word)
+
+    # Search for objects and conditions in the form of {cond1:{'object/person', 'cons', 'binder'}, cond2...}
+    distinct_parts = sent_splitter(only_cons, 'conj')
+    cons = {'cons':[]}
+    i = 1
+    for distinct in distinct_parts:
+        # Check if there's a verb in the distinct
+        cons['cons'].append({f'C{i}': get_object_consequence(distinct)})
+        i += 1
+    if binary_classifier == []:
+        binary_classifier = None
+    cons['conjs'] = binary_classifier
+    #return [cons, {'conjs': binary_classifier}]
+    return cons
+
+
+def get_object_consequence(consequence):
+        only_cons = make_string(consequence)
+        # Search for root
+        root = get_root(only_cons)
+        object_or_person = []
+        consequence = []
+        for sub in root.subtree:
+            if sub.dep_ in ['nsubj', 'nsubjpass']:
+                object_or_person.append([el for el in sub.subtree])
+            elif sub.dep_ in ['xcomp', 'prep', 'attr', 'dobj', 'npadvmod']:
+                consequence.append([el for el in sub.subtree])
+        consequence = flatten(clean_low_level(consequence))
+        consequence = remove_duplicate_chunks(consequence)
+        return {'object_or_person': flatten(object_or_person), 'c': consequence, 'binder': (root, root.lemma_)}
+###################################################################################################
+
+
+
+
+
+    # ██████  ██ ██████  ███████ ██      ██ ███    ██ ███████
+    # ██   ██ ██ ██   ██ ██      ██      ██ ████   ██ ██
+    # ██████  ██ ██████  █████   ██      ██ ██ ██  ██ █████
+    # ██      ██ ██      ██      ██      ██ ██  ██ ██ ██
+    # ██      ██ ██      ███████ ███████ ██ ██   ████ ███████
+
 
 # --------------------------------------------------------------------------------------------------
 # %% md
 # # Data processing part
 # %% Extract all data from the text data and make list ---------------------------------------------
 #filename = 'C:/Users/Arnaud/Google Drive/Master of AI/3. Thesis/thesis_2/raw_data.txt'
-def get_texts(filename):
-    filename = filename
-    temp_file = open(filename, 'r').read()
-    temp_list = temp_file.split('\n')
-    return temp_list
+
 
 temp_list = get_texts('raw_data.txt')
 # %% Make data dict --------------------------------------------------------------------------------
 # Remove unnecesarry characters
-
-def get_only_sentences(temp_list):
-    only_sentences = []
-    for sentence in temp_list:
-        if sentence != '':
-            only_sentences.append(sentence)
-    return only_sentences
 
 only_sentences = get_only_sentences(temp_list)
 # --------------------------------------------------------------------------------------------------
@@ -563,14 +809,6 @@ for el in range(0, len(only_sentences), 2):
     sentences_STNLP[only_sentences[el]] = sent_tokenize_stnlp(only_sentences[el+1])
 
 # ....... with spaCy
-def get_spacy_lib(only_sentences):
-    sentences_spacy = {}
-    for el in range(0, len(only_sentences), 2):
-        temp_list = []
-        for sentence in sp(only_sentences[el+1]).sents:
-            temp_list.append(sentence)
-        sentences_spacy[only_sentences[el]] = temp_list
-    return sentences_spacy
 
 sentences_spacy = get_spacy_lib(only_sentences)
 # --------------------------------------------------------------------------------------------------
@@ -615,11 +853,6 @@ for key in sentences_spacy:
     sentences_tokenized_spacy[key] = temp_list
 
 
-def get_tokens_spacy(sentence):
-    if 'spacy' not in str(type(sentence)):
-        sentence = sp(sentence)
-    return [word for word in sentence]
-
 # ....... with coreNLP
 sentences_tokenized_corenlp = {}
 for el in range(0, len(only_sentences), 2):
@@ -643,14 +876,6 @@ sentences_tokenized_corenlp_clean = remove_puncts(sentences_tokenized_corenlp)
 # %% POS tagging  ----------------------------------------------------------------------------------
 
 # ....... with NLTK (only here distinction possible between clean and unclean tokenized sentences)
-def nltk_POS_tag(tokenized_dict):
-    nltk_pos = {}
-    for key in tokenized_dict:
-        temp_list = []
-        for sentence in tokenized_dict[key]:
-            temp_list.append(nltk.pos_tag(sentence))
-        nltk_pos[key] = temp_list
-    return nltk_pos
 
 nltk_pos_default = nltk_POS_tag(sentences_tokenized_nltk)
 nltk_pos_clean = nltk_POS_tag(sentences_tokenized_nltk_clean)
@@ -680,11 +905,6 @@ for key in sentences_spacy:
             temp_tup_list.append(tuple([word, word.pos_]))
         final_list.append(temp_tup_list)
     sentences_POS_spacy[key] = final_list
-
-def get_pos_tags_spacy(sentence):
-    if 'spacy' not in str(type(sentence)).lower():
-        sentence = sp(sentence)
-    return [(word.text, word.pos_) for word in sentence]
 
 
 # ....... with coreNLP
@@ -821,25 +1041,7 @@ workdoc = json.loads(corenlp_depparse)['sentences']
 #doc = sp(texts)
 doc = sp("A car driver needs to pay a fine of 20 euro if he had an accident.")
 
-# Navigating parse tree
-depparse = {}
-text, dep, head_text, head_pos, children = ([] for i in range(5)) # Initialize lists
-for token in doc:
-    text.append(token.text), dep.append(token.dep_), head_text.append(token.head.text), head_pos.append(token.head.pos_),children.append([child for child in token.children])
-
-temp_list = []
-for i in range(len(text)):
-    temp_list.append((text[i],dep[i]))
-temp_dict = extract_pos_info(temp_list,dep_dict)
-
-depparse['text'] = text
-depparse['dep'] = dep
-depparse['exp'] = temp_dict['exp']
-depparse['head_text'] = head_text
-depparse['head_pos'] = head_pos
-depparse['children'] = children
-
-df_temp = pd.DataFrame(depparse)
+dep_df = get_dep_df(doc)
 
 # %% Before continuing, I need other information of the individual sentences since in one senctence, there could be references to the same entity
 # neuralcoref.add_to_pipe(sp)
@@ -874,107 +1076,6 @@ cond_cons = condition_consequence_extractor(doc)
 get_lower_level_cond(cond_cons['condition'])
 
 
-###################################################################################################
-# Functions for extraction of object and its condition
-def get_root(doc):
-    return [el for el in doc if el.dep_=='ROOT'][0]
-def clean_low_level(condition):
-    output = []
-    not_in_output = False
-    # Check for negations
-    for el in condition:
-        for i in el:
-            if i.text in 'not' or i.text in "n't":
-                output.append(i)
-                not_in_output = True
-    # Clean condition part from if statements
-    if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
-    if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ']
-    pop_list = []
-    for i in range(0, len(condition)):
-        for word in condition[i]:
-            if word.text.lower() in if_then_synonyms_words or word.text.lower() in if_then_synonyms_phrase:
-                pop_list.append(i)
-    for i in sorted(pop_list, reverse=True):
-        del condition[i]
-    if len(condition) >= 2 and not_in_output:
-        output.append(condition[1:])
-    elif len(condition) >= 2 and not not_in_output:
-        output.append(condition[0:])
-    elif len(condition) == 1:
-        output.append(condition)
-    return output
-def flatten(nested_list):
-    flat_list = []
-    for sublist in nested_list:
-        if type(sublist) == list:
-            for item in sublist:
-                flat_list.append(item)
-        else:
-            flat_list.append(sublist)
-    for el in flat_list:
-        if type(el) == list:
-            return flatten(flat_list)
-    return flat_list
-def get_ners(spacydoc):
-    return [(x.text, x.label_) for x in spacydoc.ents]
-def sent_splitter(sent, dep_tags_split):
-    parts = []
-    for word in sent:
-        if word.dep_ == dep_tags_split and word.head.pos_ in ['AUX', 'VERB']:
-            parts.append([token for token in word.subtree])
-    distinct_parts = []
-    # Make list of sent constituent parts
-    for part in parts:
-        distinct_parts.append(part)
-    # Get full and string
-    full_and_string = []
-    for part in parts:
-        [full_and_string.append(word) for word in part]
-    distinct_parts.insert(0,get_distinct_sentences(sent, full_and_string)[0])# Get first part sentence
-    return distinct_parts
-# ==================================================================================================
-# Functions to extract binary conditions
-def get_lower_level_cond(only_cond):
-    only_cond_string = make_string(only_cond)
-    # Search for root
-    root = get_root(only_cond_string)
-    object_or_person = []
-    condition = []
-    binary_classifier = []
-    # Search for binary binary_classifier AND/OR
-    for word in only_cond_string:
-        if word.pos_ == 'CCONJ' and word.dep_ == 'cc' and word.head.pos_ in ['AUX', 'VERB']:
-            binary_classifier.append(word)
-
-    # Search for objects and conditions in the form of {cond1:{'object/person', 'cond', 'binder'}, cond2...}
-    distinct_parts = sent_splitter(only_cond, 'conj')
-    conds = {'conds':[]}
-    i = 1
-    for distinct in distinct_parts:
-        # Check if there's a verb in the distinct
-        conds['conds'].append({f'cond {i}': get_object_condition(distinct)})
-        i += 1
-    if binary_classifier == []:
-        binary_classifier = None
-    return [conds, {'conjs': binary_classifier}]
-def get_object_condition(only_cond):
-    only_cond = make_string(only_cond)
-    # Search for root
-    root = get_root(only_cond)
-    object_or_person = []
-    condition = []
-    for sub in root.subtree:
-        if sub.dep_ in ['nsubj', 'nsubjpass']:
-            object_or_person.append([el for el in sub.subtree])
-        elif sub.dep_ in ['acomp', 'attr', 'dobj', 'neg', 'prep', 'advmod']:
-            condition.append([el for el in sub.subtree])
-    condition = flatten(clean_low_level(condition))
-    condition = remove_duplicate_chunks(condition)
-    return {'object_or_person': flatten(object_or_person), 'condition': condition, 'binder': (root, root.lemma_)}
-###################################################################################################
-
-
 # --------------------------------------------------------------------------------------------------
 # %% consequence staments handler ------------------------------------------------------------------
 # Then look at what condition the item/person should be in
@@ -986,48 +1087,10 @@ get_dep_parse(only_cons)
 get_lower_level_cons(cond_cons['consequence'])
 
 ###################################################################################################
-# Functions for extraction of object and its consequence
-def get_lower_level_cons(only_cons):
-    only_cons_string = make_string(only_cons)
-    # Search for root
-    object_or_person = []
-    consequence = []
-    binary_classifier = []
-
-    # Search for binary binary_classifier AND/OR
-    for word in only_cons_string:
-        if word.pos_ == 'CCONJ' and word.dep_ == 'cc' and word.head.pos_ in ['AUX', 'VERB']:
-            binary_classifier.append(word)
-
-    # Search for objects and conditions in the form of {cond1:{'object/person', 'cons', 'binder'}, cond2...}
-    distinct_parts = sent_splitter(only_cons, 'conj')
-    cons = {'cons':[]}
-    i = 1
-    for distinct in distinct_parts:
-        # Check if there's a verb in the distinct
-        cons['cons'].append({f'cons {i}': get_object_consequence(distinct)})
-        i += 1
-    if binary_classifier == []:
-        binary_classifier = None
-    return [cons, {'conjs': binary_classifier}]
-def get_object_consequence(consequence):
-        only_cons = make_string(consequence)
-        # Search for root
-        root = get_root(only_cons)
-        object_or_person = []
-        consequence = []
-        for sub in root.subtree:
-            if sub.dep_ in ['nsubj', 'nsubjpass']:
-                object_or_person.append([el for el in sub.subtree])
-            elif sub.dep_ in ['xcomp', 'prep', 'attr', 'dobj', 'npadvmod']:
-                consequence.append([el for el in sub.subtree])
-        consequence = flatten(clean_low_level(consequence))
-        consequence = remove_duplicate_chunks(consequence)
-        return {'object_or_person': flatten(object_or_person), 'consequence': consequence, 'binder': (root, root.lemma_)}
 ###################################################################################################
 
 # All key elements in place, now last representation of the rules
-doc = sp("If the service request is a product change, the customer is charged 50 euro.")
+doc = sp("If the service request is a product change and the customer is in , the customer is charged 50 euro.")
 cond_cons = condition_consequence_extractor(doc)
 
 low_cond = get_lower_level_cond(cond_cons['condition'])
@@ -1035,53 +1098,24 @@ low_cons = get_lower_level_cons(cond_cons['consequence'])
 
 get_rule(low_cond, low_cons)
 
+
 def get_rule(low_cond, low_cons):
-    # If there are more than 1 conds or cons, this means there's a conj
-    sentence_rule = []
-    objects_or_persons = []
-    conjs = []
-    conditions = []
-    links = []
-
-    for condition in low_cond[0]['conds']:
-        for el in condition:
-            objects_or_persons.append(condition[el]['object_or_person'])
-            conditions.append(condition[el]['condition'])
-            links.append(condition[el]['binder'])
-    conjs.append(low_cond[1]['conjs'])
-
-    sentence_rule.append(objects_or_persons)
-    sentence_rule.append(links)
-    sentence_rule.append(conditions)
-    sentence_rule.append(conjs)
-    sentence_rule.append('-->')
-
-    objects_or_persons = []
-    conjs = []
-    consequences = []
-    links = []
-
-    for consequence in low_cons[0]['cons']:
-        for el in consequence:
-            objects_or_persons.append(consequence[el]['object_or_person'])
-            consequences.append(consequence[el]['consequence'])
-            links.append(consequence[el]['binder'])
-    conjs.append(low_cons[1]['conjs'])
-
-    sentence_rule.append(objects_or_persons)
-    sentence_rule.append(links)
-    sentence_rule.append(consequences)
-    sentence_rule.append(conjs)
-
-    return sentence_rule
+    # Work on subjects, if 'it', 'he', 'their', 'her', 'them', 'its', 'they',
+    objects_persons = []
+    if len(low_cond['conds']) == len(low_cons['cons']):
+        for key in low_cond['conds']:
+            if
+    return objects_persons
 
 ###################################################################################################
 ###################################################################################################
+
+
 temp_set = ['The car needs to be washed if it is blue.', 'The student needs to pay 30 euro if he is 21 years old.', 'If he had an accident, the car driver needs to pay 30 euro.']
 
 # sentences_spacy['Dataset_1']
 # Test:
-for sentence in sentences_spacy['Dataset_1']:
+for sentence in sentences_spacy['Dataset_3']:
     print('--------------- NEXT SENTENCE -----------------')
     print(sentence)
     temp_doc = sp(str(sentence))
