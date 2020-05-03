@@ -409,13 +409,16 @@ def condition_consequence_extractor(doc):
     """""""""
     # First check whether there is a conditional statement in the sentence
     if condition_identifier(doc.text):
-        try:
-            output = extract_condition_consequence_2(doc)
-        except:
-            output = extract_condition_consequence_1(doc)
+        # try:
+        #     output = extract_condition_consequence_2(doc)
+        #     print(1)
+        # except:
+        output = extract_condition_consequence_1(doc)
+        print(2)
         # Check if none of the outputs is empty, if so search for other completion
         if output_empty(output):
             output = extract_condition_consequence_3(doc)
+            print(3)
         # Last part added to check whether cond and cons are together in output (bad)
         #if get_distinct_sentences(output['condition'], output['consequence']):
         #    output = extract_condition_consequence_4(doc)
@@ -432,7 +435,7 @@ def condition_consequence_extractor(doc):
 def lookup_replace_if_synonyms(text):
     if 'spacy' in str(type(text)):
         text = str(text)
-    if_then_synonyms_words = ['whenever', 'wherever']
+    if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
     if_then_synonyms_phrase = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
     for sentence_word in nltk.word_tokenize(text):
         for wordphrase in if_then_synonyms_phrase:
@@ -482,7 +485,6 @@ def extract_condition_consequence_1(doc):
                 consequence.append(i)
     return {'condition': condition, 'consequence': consequence}
 
-
 def extract_condition_consequence_2(doc):
     consequence = []
     condition = []
@@ -529,7 +531,6 @@ def extract_condition_consequence_2(doc):
                 consequence.append(word)
 
     return {'condition': condition, 'consequence': consequence}
-
 
 def extract_condition_consequence_3(doc):
     condition = []
@@ -583,8 +584,12 @@ def extract_condition_consequence_4(doc):
 
 
 def condition_identifier(sentence):
+    # if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
+    # if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ']
+
     if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
-    if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ']
+    if_then_synonyms_phrase = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
+
     # Check words
     for sentence_word in nltk.word_tokenize(sentence):
         if sentence_word.lower() in if_then_synonyms_words:
@@ -1115,7 +1120,7 @@ temp_set = ['The car needs to be washed if it is blue.', 'The student needs to p
 
 # sentences_spacy['Dataset_1']
 # Test:
-for sentence in sentences_spacy['Dataset_3']:
+for sentence in sentences_spacy['Dataset_1']:
     print('--------------- NEXT SENTENCE -----------------')
     print(sentence)
     temp_doc = sp(str(sentence))
@@ -1130,6 +1135,98 @@ for sentence in sentences_spacy['Dataset_3']:
         print('Lower level conditional: ', obj_cond)
         obj_cons = get_lower_level_cons(only_cons)
         print('Lower level consequence: ', obj_cons)
+        get_dep_parse(temp_doc)
+        # try:
+        #     print('ADVCL')
+        #     print(sent_splitter(temp_doc, 'advcl'))
+        # except:
+        #     print('PREP')
+        #     print(sent_splitter(temp_doc, 'prep'))
     else:
         print(cond_cons)
     print('-----------------------------------------------')
+
+sent = "Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny."
+
+doc = sp(sent)
+
+condition_consequence_extractor(doc)
+
+get_dep_parse(doc)
+
+####################################################################################################
+# Problem if conj is not part of advcl subtree
+
+if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
+if_then_synonyms_phrase = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
+
+
+testsent_1 = "If the upcoming days are sunny, salad should be bought."
+testsent_2 = "In the case that the upcoming days are sunny, salad should be bought."
+testsent_3 = "Assuming that  the upcoming days are sunny, salad should be bought."
+testsent_4 = "Whenever the upcoming days are sunny, salad should be bought."
+testsent_5 = "Conceding that  the upcoming days are sunny, salad should be bought."
+testsent_6 = "Given that the upcoming days are sunny, salad should be bought."
+testsent_7 = "Provided that  the upcoming days are sunny, salad should be bought."
+
+for i in [testsent_1, testsent_2, testsent_3, testsent_4, testsent_5, testsent_6, testsent_7]:
+    for t in sp(i):
+        if 
+
+
+
+def extract_condition_consequence_except(doc):
+    condition = []
+    consequence = []
+    for token in doc:
+        if token.dep_ == 'advcl':
+            [condition.append(child) for child in token.subtree]
+        if token.dep_ == 'ROOT':
+            before =[]
+            after = []
+            for child in token.children:
+                if child.dep_ != 'advcl' and child.dep_ != 'advmod': # and child.dep_ != 'prep'
+                    if child.idx < token.idx:
+                        # Append everything before root
+                        [before.append(i) for i in child.subtree]
+                    else:
+                        # Append everything after root
+                        [after.append(i) for i in child.subtree]
+            for i in before:
+                consequence.append(i)
+            consequence.append(token)
+            for i in after:
+                consequence.append(i)
+    return {'condition': condition, 'consequence': consequence}
+
+
+advcl_in_root = False
+for token in doc:
+    # Search ROOT word
+    if token.dep_ == 'ROOT':
+        if 'advcl' in [t.dep_ for t in token.children]:
+            advcl_in_root = True
+
+# First possibility
+if advcl_in_root:
+    for token in doc:
+        if token.dep_ == 'advcl':
+            [condition.append(child) for child in token.subtree]
+        if token.dep_ == 'ROOT':
+            before =[]
+            after = []
+            for child in token.children:
+                if child.dep_ != 'advcl' and child.dep_ != 'advmod': # and child.dep_ != 'prep'
+                    if child.idx < token.idx:
+                        # Append everything before root
+                        [before.append(i) for i in child.subtree]
+                    else:
+                        # Append everything after root
+                        [after.append(i) for i in child.subtree]
+            for i in before:
+                consequence.append(i)
+            consequence.append(token)
+            for i in after:
+                consequence.append(i)
+    return {'condition': condition, 'consequence': consequence}
+else:
