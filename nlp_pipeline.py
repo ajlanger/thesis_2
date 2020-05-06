@@ -425,7 +425,6 @@ def condition_consequence_extractor(doc):
         output = {'condition': remove_duplicate_chunks(output['condition']), 'consequence': remove_duplicate_chunks(output['consequence'])}
         disctinct_sentences = get_distinct_sentences(output['condition'], output['consequence'])
         output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
-
         return output
     else:
         return 'No conditional statement in sentence'
@@ -460,30 +459,36 @@ def replace_sentence_part_by_index(text, indices_to_replace):
     else:
         return text[:indices_to_replace[0]] + 'if ' + text[indices_to_replace[1]:]
 
+sess = sp("On the other hand, in case of rainy weather on Tuesday, tomato sandwiches need to be made.")
+extract_condition_consequence_3(sess)
+
 
 def extract_condition_consequence_1(doc):
     condition = []
     consequence = []
-    for token in doc:
-        if token.dep_ == 'advcl':
-            [condition.append(child) for child in token.subtree]
-        if token.dep_ == 'ROOT':
-            before =[]
-            after = []
-            for child in token.children:
-                if child.dep_ != 'advcl' and child.dep_ != 'advmod': # and child.dep_ != 'prep'
-                    if child.idx < token.idx:
-                        # Append everything before root
-                        [before.append(i) for i in child.subtree]
-                    else:
-                        # Append everything after root
-                        [after.append(i) for i in child.subtree]
-            for i in before:
-                consequence.append(i)
-            consequence.append(token)
-            for i in after:
-                consequence.append(i)
-    return {'condition': condition, 'consequence': consequence}
+    possible_conditions, possible_ors = get_possible_conditions(doc)
+    for key in possible_conditions:
+        if possible_conditions[key] != []:
+            for token in doc:
+                if token.dep_ == key:
+                    [condition.append(child) for child in token.subtree]
+                if token.dep_ == 'ROOT':
+                    before =[]
+                    after = []
+                    for child in token.children:
+                        if child.dep_ != key:
+                            if child.idx < token.idx:
+                                # Append everything before root
+                                [before.append(i) for i in child.subtree]
+                            else:
+                                # Append everything after root
+                                [after.append(i) for i in child.subtree]
+                    for i in before:
+                        consequence.append(i)
+                    consequence.append(token)
+                    for i in after:
+                        consequence.append(i)
+            return {'condition': condition, 'consequence': consequence}
 
 def extract_condition_consequence_2(doc):
     consequence = []
@@ -531,6 +536,7 @@ def extract_condition_consequence_2(doc):
                 consequence.append(word)
 
     return {'condition': condition, 'consequence': consequence}
+
 
 def extract_condition_consequence_3(doc):
     condition = []
@@ -588,14 +594,28 @@ def condition_identifier(sentence):
     # if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ']
 
     if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
-    if_then_synonyms_phrase = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
+    if_then_synonyms_phrases = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
 
     # Check words
     for sentence_word in nltk.word_tokenize(sentence):
         if sentence_word.lower() in if_then_synonyms_words:
             return True
         else:
-            for wordphrase in if_then_synonyms_phrase:
+            for wordphrase in if_then_synonyms_phrases:
+                if wordphrase in sentence.lower():
+                    return True
+    return False
+
+def else_identifier(sentence):
+    else_synonyms_words = ['differently', 'otherwise', 'diversely', 'contrarily', 'elseways']
+    else_synonyms_phrases = ['any other way ', 'if not ', 'in different circumstances ', 'on the other hand ', 'or else ', 'or then ']
+
+    # Check words
+    for sentence_word in nltk.word_tokenize(sentence):
+        if sentence_word.lower() in else_synonyms_words:
+            return True
+        else:
+            for wordphrase in else_synonyms_phrases:
                 if wordphrase in sentence.lower():
                     return True
     return False
@@ -1126,16 +1146,17 @@ for sentence in sentences_spacy['Dataset_1']:
     temp_doc = sp(str(sentence))
     cond_cons = condition_consequence_extractor(temp_doc)
     if cond_cons != 'No conditional statement in sentence':
-        cond = cond_cons['condition']
-        cons = cond_cons['consequence']
-        only_cond = make_string(cond)
-        only_cons = make_string(cons)
-        print('High level rule: ', cond_cons)
-        obj_cond = get_lower_level_cond(only_cond)
-        print('Lower level conditional: ', obj_cond)
-        obj_cons = get_lower_level_cons(only_cons)
-        print('Lower level consequence: ', obj_cons)
-        get_dep_parse(temp_doc)
+        #cond = cond_cons['condition']
+        #cons = cond_cons['consequence']
+        #only_cond = make_string(cond)
+        #only_cons = make_string(cons)
+        #print('High level rule: ', cond_cons)
+        #obj_cond = get_lower_level_cond(only_cond)
+        #print('Lower level conditional: ', obj_cond)
+        #obj_cons = get_lower_level_cons(only_cons)
+        #print('Lower level consequence: ', obj_cons)
+        print(get_possible_conditions(temp_doc))
+
         # try:
         #     print('ADVCL')
         #     print(sent_splitter(temp_doc, 'advcl'))
@@ -1146,87 +1167,235 @@ for sentence in sentences_spacy['Dataset_1']:
         print(cond_cons)
     print('-----------------------------------------------')
 
-sent = "Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny."
-
-doc = sp(sent)
-
-condition_consequence_extractor(doc)
-
-get_dep_parse(doc)
 
 ####################################################################################################
-# Problem if conj is not part of advcl subtree
-
+# PRELIMINARY RESEARCH PART 1 ######################################################################
+####################################################################################################
 if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
 if_then_synonyms_phrase = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
 
+testsent_1 = "In case that the upcoming days are sunny salad should be bought."
+testsent_2 = "In the case that the upcoming days are sunny salad should be bought."
+testsent_3 = "Assuming that the upcoming days are sunny salad should be bought."
+testsent_4 = "Whenever the upcoming days are sunny salad should be bought."
+testsent_5 = "Conceding that the upcoming days are sunny salad should be bought."
+testsent_6 = "Given that the upcoming days are sunny salad should be bought."
+testsent_7 = "Provided that the upcoming days are sunny salad should be bought."
+testsent_8 = "Granted that the upcoming days are sunny salad should be bought."
 
-testsent_1 = "If the upcoming days are sunny, salad should be bought."
-testsent_2 = "In the case that the upcoming days are sunny, salad should be bought."
-testsent_3 = "Assuming that  the upcoming days are sunny, salad should be bought."
-testsent_4 = "Whenever the upcoming days are sunny, salad should be bought."
-testsent_5 = "Conceding that  the upcoming days are sunny, salad should be bought."
-testsent_6 = "Given that the upcoming days are sunny, salad should be bought."
-testsent_7 = "Provided that  the upcoming days are sunny, salad should be bought."
+test_sent_root = "If the upcoming days are sunny, salad should be bought."
 
-for i in [testsent_1, testsent_2, testsent_3, testsent_4, testsent_5, testsent_6, testsent_7]:
-    for t in sp(i):
-        if 
+####################################################################################################
+# PRELIMINARY RESEARCH PART 2 ######################################################################
+####################################################################################################
 
+core_sent = "Salad should be bought if the upcoming days are sunny."
+core_sent = "A different supplier should be chosen if he does not comply with our requirements."
 
+testsent_1 = "A different supplier should be chosen, in case that he does not comply with our requirements and committed a crime."
+testsent_2 = "A different supplier should be chosen, in the case that he does not comply with our requirements and committed a crime."
+testsent_3 = "A different supplier should be chosen, assuming that he does not comply with our requirements and committed a crime."
+testsent_4 = "A different supplier should be chosen, whenever he does not comply with our requirements and committed a crime."
+testsent_5 = "A different supplier should be chosen, conceding that he does not comply with our requirements or committed a crime."
+testsent_6 = "A different supplier should be chosen, given that he does not comply with our requirements or committed a crime."
+testsent_7 = "A different supplier should be chosen, provided that he does not comply with our requirements or committed a crime."
+testsent_8 = "A different supplier should be chosen, granted that he does not comply with our requirements or committed a crime."
+testsent_9 = "Salad should be bought, in case that the upcoming days are sunny and the supplier is reliable."
+testsent_10 = "Salad should be bought, in the case that the upcoming days are sunny and the supplier is reliable."
+testsent_11 = "Salad should be bought, assuming that the upcoming days are sunny and the supplier is reliable."
+testsent_12 = "Salad should be bought, whenever the upcoming days are sunny and the supplier is reliable."
+testsent_13 = "Salad should be bought, conceding that the upcoming days are sunny or the supplier is reliable."
+testsent_14= "Salad should be bought, given that the upcoming days are sunny or the supplier is reliable."
+testsent_15 = "Salad should be bought, provided that the upcoming days are sunny or the supplier is reliable."
+testsent_16 = "Salad should be bought, granted that the upcoming days are sunny or the supplier is reliable."
 
-def extract_condition_consequence_except(doc):
-    condition = []
+tests = "Unless the person is sick, he should take public transport."
+
+########################################################################################################################################################################################################
+
+# If-then-else structures
+else_synonyms_words = ['differently', 'otherwise', 'diversely', 'contrarily', 'elseways']
+else_synonyms_phrases = ['any other way', 'if not', 'in different circumstances', 'on the other hand', 'or else', 'or then']
+sent1 = sp('If the legal status of the tax payer is married, then the social contributions amount to 35% of her gross income, otherwise to 42% of her gross income')
+sent2 = 'When the person is 30 years old, he needs to have a driver license, otherwise he needs an ID.'
+sent3 = 'Only premium customers can be permitted to vip longue.'
+
+condition_consequence_extractor(sent1)
+
+get_possible_conditions(sent1)
+get_dep_parse(sent1)
+
+# Other strategy: make all possible sub structures and then assign a label to each
+def get_possible_conditions(doc):
+    dep_tags_split = ['advcl', 'ccomp', 'xcomp', 'prep', 'conj']
+    output_dict_conditions = {'advcl':[], 'ccomp':[], 'xcomp':[], 'prep':[], 'conj':[]}
+    output_dict_conditions_elses = {'advcl':[], 'ccomp':[], 'xcomp':[], 'prep':[], 'conj':[]}
     consequence = []
-    for token in doc:
-        if token.dep_ == 'advcl':
-            [condition.append(child) for child in token.subtree]
-        if token.dep_ == 'ROOT':
-            before =[]
-            after = []
-            for child in token.children:
-                if child.dep_ != 'advcl' and child.dep_ != 'advmod': # and child.dep_ != 'prep'
-                    if child.idx < token.idx:
-                        # Append everything before root
-                        [before.append(i) for i in child.subtree]
-                    else:
-                        # Append everything after root
-                        [after.append(i) for i in child.subtree]
-            for i in before:
-                consequence.append(i)
-            consequence.append(token)
-            for i in after:
-                consequence.append(i)
+    dep_tag_words = [word for word in doc if word.dep_ in dep_tags_split]
+    doc_idx = [wi.idx for wi in doc]
+    for word in doc:
+        # Get all different condition possibilities
+        if word.dep_ in dep_tags_split:
+            string = ''
+            for w in [subtreeword for subtreeword in word.subtree]:
+                string += w.text + ' '
+            if condition_identifier(string):
+                output_dict_conditions[word.dep_].append([subtreeword for subtreeword in word.subtree])
+            elif else_identifier(string):
+                output_dict_conditions_elses[word.dep_].append([subtreeword for subtreeword in word.subtree])
+    for word in doc:
+        append_conj_to_output = True
+        if word.dep_ == 'conj' and not condition_identifier(string):
+            # Get dislocated conjunction parts too (not in the condition part)
+            list_to_append = [subtreeword for subtreeword in word.subtree]
+
+            # Check whether none of the words appear in other already found parts
+            found_condition_idx_list = []
+            for key in output_dict_conditions_elses:
+                for element in output_dict_conditions_elses[key]:
+                    for wordidx in element:
+                        found_condition_idx_list.append(wordidx.idx)
+            for el in list_to_append:
+                if el.idx in found_condition_idx_list:
+                    append_conj_to_output = False
+            # Also append any adjoining ands or ors or advmods
+            if append_conj_to_output:
+                for words in doc:
+                    if words.dep_ == 'cc' and (doc_idx.index(words.idx) - doc_idx.index(list_to_append[0].idx) == -1):
+                        list_to_append.insert(0, words)
+                output_dict_conditions_elses[word.dep_].append(list_to_append)
+    return output_dict_conditions, output_dict_conditions_elses
+
+
+def get_condition(possible_conditions):
+    if possible_conditions['conj'] != []:
+        for key in possible_conditions:
+            if possible_conditions[key] != [] and key != 'conj':
+                for w in possible_conditions['conj'][0]:
+                    possible_conditions[key][0].append(w)
+                return possible_conditions[key][0], 'mixed'
+
+    if possible_conditions['advcl'] != []:
+        return possible_conditions['advcl'], 'advcl'
+    for key in possible_conditions:
+        if possible_conditions[key] != []:
+            return possible_conditions[key], str(key)
+
+
+def get_cond_cons_V2(doc):
+    possible_conditions = get_possible_conditions(doc)
+    condition, dep_tag = get_condition(possible_conditions)
+
+    # If the tags in dep_tags_split originate from root, the subtree of that root without the tag is the consequence
+    root = get_root(doc)
+    dep_in_root = False
+    consequence = []
+    for c1 in root.children:
+        if c1.dep_ == dep_tag:
+            dep_in_root = True
+    if dep_in_root and dep_tag != 'mixed':
+        before =[]
+        after = []
+        for child in root.children:
+            if child.dep_ not in dep_tag:
+                if child.idx < root.idx:
+                    # Append everything before root
+                    [before.append(i) for i in child.subtree]
+                else:
+                    # Append everything after root
+                    [after.append(i) for i in child.subtree]
+        for i in before:
+            consequence.append(i)
+        consequence.append(root)
+        for i in after:
+            consequence.append(i)
+    else:
+        # In this case just return the difference between the condition and the full sentence
+        try:
+            condition_idx = [w.idx for w in condition[0]]
+        except:
+            condition_idx = [w.idx for w in condition]
+        consequence = [word for word in doc if word.idx not in condition_idx]
+
     return {'condition': condition, 'consequence': consequence}
 
+testlist = [testsent_1, testsent_2, testsent_3, testsent_4, testsent_5, testsent_6, testsent_7, testsent_8, testsent_9, testsent_10, testsent_11, testsent_12, testsent_13, testsent_14, testsent_15, testsent_16]
 
-advcl_in_root = False
-for token in doc:
-    # Search ROOT word
-    if token.dep_ == 'ROOT':
-        if 'advcl' in [t.dep_ for t in token.children]:
-            advcl_in_root = True
+# sentences_spacy['Dataset_4']
+# testlist
+for sentence in sentences_spacy['Dataset_1']:
+    print('--------------- NEXT SENTENCE -----------------')
+    print(sentence)
+    temp_doc = sp(str(sentence))
+    cond_cons = condition_consequence_extractor(temp_doc)
+    if cond_cons != 'No conditional statement in sentence':
+        output = condition_consequence_extractor(temp_doc)
+        print(output)
+    else:
+        print('possible logic: ', get_lower_level_cond(temp_doc), ' or ', get_lower_level_cons(temp_doc))
 
-# First possibility
-if advcl_in_root:
-    for token in doc:
-        if token.dep_ == 'advcl':
-            [condition.append(child) for child in token.subtree]
-        if token.dep_ == 'ROOT':
-            before =[]
-            after = []
-            for child in token.children:
-                if child.dep_ != 'advcl' and child.dep_ != 'advmod': # and child.dep_ != 'prep'
-                    if child.idx < token.idx:
-                        # Append everything before root
-                        [before.append(i) for i in child.subtree]
-                    else:
-                        # Append everything after root
-                        [after.append(i) for i in child.subtree]
-            for i in before:
-                consequence.append(i)
-            consequence.append(token)
-            for i in after:
-                consequence.append(i)
-    return {'condition': condition, 'consequence': consequence}
-else:
+    print('-----------------------------------------------')
+
+sess = sp("Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny.")
+
+def cut_change_if_needed(original_doc, cond, cons):
+    original_idx = [sword.idx for sword in original_doc]
+    cons_idx = [word.idx for word in cons]
+    cond_idx = [word.idx for word in cond]
+
+    cons_chron = [original_idx.index(idx_num) for idx_num in cons_idx]
+    cond_chron = [original_idx.index(idx_num) for idx_num in cond_idx]
+
+    # Check cond chronology:
+    cons_chron_check = True
+    for i in range(1, len(cons_chron)):
+        if cons_chron[i-1] - cons_chron[i] != -1:
+            cons_chron_check, false_index_cons = False, i
+    cond_chron_check = True
+    for i in range(1, len(cond_chron)):
+        if cond_chron[i-1] - cond_chron[i] != -1:
+            cond_chron_check, false_index_cond = False, i
+    print('cond_chron_check: ', cond_chron_check, 'cons_chron_check: ', cons_chron_check)
+    corresponding_idxs = []
+    if not cons_chron_check:
+        if cond_chron[-1] < cons_chron[false_index_cons]:
+            for index in cons_chron[false_index_cons:]:
+                corresponding_idxs.append(original_idx[index])
+            for el in cons_chron[false_index_cons:]:
+                cond_chron.append(el)
+        idx_for_cons = []
+        new_cond = []
+        for i in cond_chron:
+            idx_for_cons.append(original_idx[i])
+        for word in original_doc:
+            if word.idx in idx_for_cons:
+                new_cond.append(word)
+        cond = new_cond
+        cons = cons[:false_index_cons]
+
+    corresponding_idxs = []
+    if not cond_chron_check:
+        if cons_chron[-1] < cond_chron[false_index_cond]:
+            for index in cond_chron[false_index_cond:]:
+                corresponding_idxs.append(original_idx[index])
+            for el in cond_chron[false_index_cond:]:
+                cons_chron.append(el)
+        idx_for_cond = []
+        new_cons = []
+        for i in cons_chron:
+            idx_for_cond.append(original_idx[i])
+        for word in original_doc:
+            if word.idx in idx_for_cond:
+                new_cons.append(word)
+        cons = new_cons
+        cond = cond[:false_index_cond]
+
+    return {'condition': cond, 'consequence': cons}
+
+testss = sp("Further, if the day is Wednesday and the weather is rainy on the other hand, fish-salad sandwiches need to be made.")
+
+get_possible_conditions(testss)
+cond, cons = condition_consequence_extractor(testss)['condition'], condition_consequence_extractor(testss)['consequence']
+condition_consequence_extractor(testss)
+
+cut_change_if_needed(testss, cond, cons)
