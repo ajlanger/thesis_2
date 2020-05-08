@@ -400,6 +400,9 @@ def remove_elements(remove_list, indexlist):
         del remove_list[i]
     return remove_list
 
+def get_root(doc):
+    return [el for el in doc if el.dep_=='ROOT'][0]
+
 
 
 #  ██████  ██████  ███    ██ ██████  ██ ████████ ██  ██████  ███    ██
@@ -440,6 +443,8 @@ def condition_consequence_extractor_v4(doc):
         possible_conditions, possible_ors = get_possible_conditions(doc)
         condition_part, split_keys = get_condition_v4(doc, possible_conditions, possible_ors)
         consequence_part = get_consequence_v4(doc, split_keys)
+        ############################################################################################
+        # Probably not needed anymore
         # Perform cleaning on output:
         output = {'condition': remove_duplicate_chunks(condition_part), 'consequence': remove_duplicate_chunks(consequence_part)}
         disctinct_sentences = get_distinct_sentences_v2(condition_part, consequence_part)
@@ -453,7 +458,7 @@ def condition_consequence_extractor_v4(doc):
             print('condition WITH cleaning: ', output['condition'])
             print('consequence WITH cleaning: ', output['consequence'])
             print('#############')
-
+        ############################################################################################
         return output
     else:
         return 'No conditional statement in sentence'
@@ -477,7 +482,8 @@ def get_condition_v4(doc, possible_conditions, possible_ors):
             if possible_ors['conj'] != []:
                 possible_ors_idx = [word.idx for word in possible_ors['conj'][0]]
                 # If the first conj word comes right after the condition part, append it
-                if (doc_idx.index(possible_conditions[key][0][0].idx) - doc_idx.index(possible_ors['conj'][0][0].idx) == -1):
+
+                if (doc_idx.index(possible_conditions[key][0][-1].idx) - doc_idx.index(possible_ors['conj'][0][0].idx) == -1):
                     for word in possible_ors['conj'][0]:
                         condition.append(word)
                     return condition, [key, 'conj']
@@ -512,7 +518,8 @@ def get_consequence_v4(doc, split_keys):
     before =[]
     after = []
     for child in root_word.children:
-        if child.dep_ not in split_keys:
+        # If the tag is not in split_keys and theres no condition in that subtree, append it to cons
+        if child.dep_ not in split_keys or not condition_identifier(' '.join([c.text for c in child.subtree])):
             if child.idx < root_word.idx:
                 # Append everything before root
                 [before.append(i) for i in child.subtree]
@@ -917,10 +924,6 @@ def extract_condition_consequence_4(doc):
 
 ###################################################################################################
 # Functions for extraction of object and its condition
-def get_root(doc):
-    return [el for el in doc if el.dep_=='ROOT'][0]
-
-
 def clean_low_level(condition):
     output = []
     not_in_output = False
@@ -1075,11 +1078,11 @@ def get_object_consequence(consequence):
 
 
 
-    # ██████  ██ ██████  ███████ ██      ██ ███    ██ ███████
-    # ██   ██ ██ ██   ██ ██      ██      ██ ████   ██ ██
-    # ██████  ██ ██████  █████   ██      ██ ██ ██  ██ █████
-    # ██      ██ ██      ██      ██      ██ ██  ██ ██ ██
-    # ██      ██ ██      ███████ ███████ ██ ██   ████ ███████
+# ██████  ██ ██████  ███████ ██      ██ ███    ██ ███████
+# ██   ██ ██ ██   ██ ██      ██      ██ ████   ██ ██
+# ██████  ██ ██████  █████   ██      ██ ██ ██  ██ █████
+# ██      ██ ██      ██      ██      ██ ██  ██ ██ ██
+# ██      ██ ██      ███████ ███████ ██ ██   ████ ███████
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1088,7 +1091,7 @@ def get_object_consequence(consequence):
 #filename = 'C:/Users/Arnaud/Google Drive/Master of AI/3. Thesis/thesis_2/raw_data.txt'
 
 
-temp_list = get_texts('raw_data.txt')
+temp_list = get_texts('textual_data/raw_data.txt')
 # %% Make data dict --------------------------------------------------------------------------------
 # Remove unnecesarry characters
 
@@ -1480,7 +1483,7 @@ condition_consequence_extractor_v4(ex_sentence)
 
 # sentences_spacy['Dataset_1']
 # Test:
-for sentence in testlist:
+for sentence in sentences_spacy['Dataset_4']:
     print('--------------- NEXT SENTENCE -----------------')
     print(sentence)
     temp_doc = sp(str(sentence))
@@ -1497,7 +1500,7 @@ for sentence in testlist:
         #print('Lower level conditional: ', obj_cond)
         #obj_cons = get_lower_level_cons(only_cons)
         #print('Lower level consequence: ', obj_cons)
-        #print(cond_cons2)
+    print(cond_cons3)
     #else:
         #print(cond_cons2)
     print('-----------------------------------------------')
@@ -1506,7 +1509,7 @@ testsentence = sp("An employee should receive a bonus given that he achieved his
 
 
 teeess = sp("A person may go to the toilet whenever she is beautiful, funny and can not hold her pee.")
-
+condition_consequence_extractor_v4(testsentence)
 
 testsentence2 = sp("Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny.")
 condition_consequence_extractor_v4(testsentence2)
@@ -1514,6 +1517,7 @@ condition_consequence_extractor_v4(testsentence2)
 get_dep_parse(testsentence2)
 
 ssss = sp("In the case that the computer is reliable, the mouse is shipped with the present and an extra keyboard is added.")
-condition_consequence_extractor_v3(ssss)
+condition_consequence_extractor_v4(ssss)
+
 
 get_dep_parse(ssss)
