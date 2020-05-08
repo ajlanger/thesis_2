@@ -287,6 +287,7 @@ def get_distinct_sentences(cond,cons):
         cond = remove_wrong_part(cons, cond)
     return [cond, cons]
 
+
 def get_distinct_sentences_v2(cond,cons):
     cond_idx = [word.idx for word in cond]
     cons_idx = [word.idx for word in cons]
@@ -424,8 +425,6 @@ def condition_consequence_extractor_v3(doc):
         possible_conditions, possible_ors = get_possible_conditions(doc)
         condition_part, split_key = get_condition_v3(possible_conditions)
         consequence_part = get_consequence_v3(doc, split_key)
-        #print('condition without cleaning: ', condition_part)
-        #print('consequence without cleaning: ', consequence_part)
         # Perform cleaning on output:
         output = {'condition': remove_duplicate_chunks(condition_part), 'consequence': remove_duplicate_chunks(consequence_part)}
         disctinct_sentences = get_distinct_sentences(condition_part, consequence_part)
@@ -439,14 +438,21 @@ def condition_consequence_extractor_v3(doc):
 def condition_consequence_extractor_v4(doc):
     if condition_identifier(doc):
         possible_conditions, possible_ors = get_possible_conditions(doc)
-        condition_part, split_keys = get_condition_v4(possible_conditions, possible_ors)
+        condition_part, split_keys = get_condition_v4(doc, possible_conditions, possible_ors)
         consequence_part = get_consequence_v4(doc, split_keys)
-        #print('condition without cleaning: ', condition_part)
-        #print('consequence without cleaning: ', consequence_part)
         # Perform cleaning on output:
         output = {'condition': remove_duplicate_chunks(condition_part), 'consequence': remove_duplicate_chunks(consequence_part)}
         disctinct_sentences = get_distinct_sentences_v2(condition_part, consequence_part)
         output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
+
+        if condition_part != output['condition'] or consequence_part != output['consequence']:
+            print('#############')
+            print('UNCLEANED AND CLEANED NOT EQUAL: ')
+            print('condition without cleaning: ', condition_part)
+            print('consequence without cleaning: ', consequence_part)
+            print('condition WITH cleaning: ', output['condition'])
+            print('consequence WITH cleaning: ', output['consequence'])
+            print('#############')
 
         return output
     else:
@@ -459,15 +465,22 @@ def get_condition_v3(possible_conditions):
             condition = flatten(possible_conditions[key])
             return condition, key
 
-def get_condition_v4(possible_conditions, possible_ors):
+
+def get_condition_v4(doc, possible_conditions, possible_ors):
+    doc_idx = [word.idx for word in doc]
     for key in possible_conditions:
         if possible_conditions[key] != []:
+            possible_conditions_idx = [word.idx for word in possible_conditions[key][0]]
             condition = flatten(possible_conditions[key])
 
-            if possible_ors['conj'] != [] and possible_ors['conj'][0][0].idx > possible_conditions[key][0][-1].idx:
-                for word in possible_ors['conj'][0]:
-                    condition.append(word)
-                return condition, [key, 'conj']
+            #if possible_ors['conj'] != [] and possible_ors['conj'][0][0].idx > possible_conditions[key][0][-1].idx:
+            if possible_ors['conj'] != []:
+                possible_ors_idx = [word.idx for word in possible_ors['conj'][0]]
+                # If the first conj word comes right after the condition part, append it
+                if (doc_idx.index(possible_conditions[key][0][0].idx) - doc_idx.index(possible_ors['conj'][0][0].idx) == -1):
+                    for word in possible_ors['conj'][0]:
+                        condition.append(word)
+                    return condition, [key, 'conj']
             return condition, [key]
 
 def get_consequence_v3(doc, split_key):
@@ -532,12 +545,25 @@ def get_possible_conditions(doc):
                 string += w.text + ' '
             if condition_identifier(string):
                 output_dict_conditions[word.dep_].append([subtreeword for subtreeword in word.subtree])
+            # It's possible that the previous word is not accounted for, which could result in a false for the condition_identifier
+            elif not condition_identifier(string):
+                string = [w for w in word.ancestors][0].text + ' '
+                for w in [subtreeword for subtreeword in word.subtree]:
+                    string += w.text + ' '
+                if condition_identifier(string):
+                    output_dict_conditions[word.dep_].append([subtreeword for subtreeword in word.subtree])
+                #output_dict_conditions[word.dep_].append([subtreeword for subtreeword in word.subtree])
             #elif else_identifier(string):
             #    output_dict_conditions_elses[word.dep_].append([subtreeword for subtreeword in word.subtree])
     # Append only the conjs originating from root, because those are more likely to be dislocated from the condition part and have more risk of being added to the consequence
     for child in get_root(doc).children:
         if child.dep_ == 'conj':
             output_dict_conditions_elses[child.dep_].append([c for c in child.subtree])
+            # Also append any cc words that were left behind
+            for words in doc:
+                if words.dep_ == 'cc' and (doc_idx.index(words.idx) - doc_idx.index(output_dict_conditions_elses[child.dep_][0][0].idx) == -1):
+                    output_dict_conditions_elses[child.dep_][0].insert(0, words)
+
     for word in doc:
         append_conj_to_output = True
         if word.dep_ == 'conj' and not condition_identifier(string):
@@ -570,8 +596,8 @@ def condition_identifier(sentence):
     if 'spacy' in str(type(sentence)).lower():
         sentence = sentence.text
 
-    if_then_synonyms_words = ['if', 'whenever', 'wherever', 'when', 'unless']
-    if_then_synonyms_phrases = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
+    if_then_synonyms_words = ['if', 'whenever', 'wherever', 'when', 'unless', 'presuming']
+    if_then_synonyms_phrases = ['in the case that','assuming that', 'conceding that ', 'granted that', 'in case that', 'on the assumption that', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that', 'on condition that ', 'on the condition that', 'given that', 'if and only if ', 'presuming that', 'providing that', 'provided that', 'contingent on ', 'whenever that', 'in the event that']
 
     # Check words
 
@@ -1449,17 +1475,19 @@ input_sentence3 = sp('Whenever a patient has the allergies and he is older than 
 
 ex_sentence = sp('An employee should receive a bonus given that he achieved his yearly sales quotum.')
 
+condition_consequence_extractor_v4(ex_sentence)
+
 
 # sentences_spacy['Dataset_1']
 # Test:
-for sentence in sentences_spacy['Dataset_1']:
+for sentence in testlist:
     print('--------------- NEXT SENTENCE -----------------')
     print(sentence)
     temp_doc = sp(str(sentence))
-    cond_cons1 = condition_consequence_extractor(temp_doc)
-    cond_cons2 = condition_consequence_extractor_v3(temp_doc)
+    #cond_cons1 = condition_consequence_extractor(temp_doc)
+    #cond_cons2 = condition_consequence_extractor_v3(temp_doc)
     cond_cons3 = condition_consequence_extractor_v4(temp_doc)
-    if cond_cons != 'No conditional statement in sentence':
+    #if cond_cons != 'No conditional statement in sentence':
         #cond = cond_cons['condition']
         #cons = cond_cons['consequence']
         #only_cond = make_string(cond)
@@ -1470,28 +1498,22 @@ for sentence in sentences_spacy['Dataset_1']:
         #obj_cons = get_lower_level_cons(only_cons)
         #print('Lower level consequence: ', obj_cons)
         #print(cond_cons2)
-        if cond_cons2 != cond_cons3:
-            print(' Not Equal ')
-            print('Old: ', cond_cons2, 'New: ', cond_cons3)
-
-    else:
-        print(cond_cons2)
+    #else:
+        #print(cond_cons2)
     print('-----------------------------------------------')
 
 testsentence = sp("An employee should receive a bonus given that he achieved his yearly sales quotum.")
 
-condition_consequence_extractor_v3(testsentence)
-
-get_possible_conditions(testsentence2)
-get_dep_parse(sp(sent1))
 
 teeess = sp("A person may go to the toilet whenever she is beautiful, funny and can not hold her pee.")
-get_possible_conditions(teeess)
 
-condition_consequence_extractor_v3(sp(sent1))
 
-"A child with 3 bears may be admitted."
+testsentence2 = sp("Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny.")
+condition_consequence_extractor_v4(testsentence2)
 
-get_lower_level_cons(sp("A child with 3 bears may be admitted."))
+get_dep_parse(testsentence2)
 
-testsentence2 = sp("A boat needs to be checked, washed and delivered if it has an age of 20 years, is stinky and has a license plate.")
+ssss = sp("In the case that the computer is reliable, the mouse is shipped with the present and an extra keyboard is added.")
+condition_consequence_extractor_v3(ssss)
+
+get_dep_parse(ssss)
