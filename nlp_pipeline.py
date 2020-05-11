@@ -423,6 +423,34 @@ def get_root(doc):
 # ██   ██ ██ ██    ██ ██   ██     ██      ██       ██  ██  ██      ██
 # ██   ██ ██  ██████  ██   ██     ███████ ███████   ████   ███████ ███████
 
+def implied_condition_consequence_extractor(doc):
+    """
+    Function to extract condition-consequence from sentence without actual condition indicator
+    """
+    root_word = get_root(doc)
+    before = []
+    after = []
+    consequence = []
+
+    for w in root_word.children:
+        if w.dep_ == 'nsubj' or w.dep_ == 'nsubjpass':
+            condition = [wi for wi in w.subtree]
+        else:
+            if w.idx < root_word.idx:
+                # Append everything before root
+                [before.append(i) for i in w.subtree]
+            else:
+                # Append everything after root
+                [after.append(i) for i in w.subtree]
+    for i in before:
+        consequence.append(i)
+    consequence.append(root_word)
+    for i in after:
+        consequence.append(i)
+
+    return {'condition': condition, 'consequence': consequence}
+
+
 def condition_consequence_extractor_v3(doc):
     if condition_identifier(doc):
         possible_conditions, possible_ors = get_possible_conditions(doc)
@@ -461,7 +489,8 @@ def condition_consequence_extractor_v4(doc):
         ############################################################################################
         return output
     else:
-        return 'No conditional statement in sentence'
+        print('No conditional statement in sentence')
+        return implied_condition_consequence_extractor(doc)
 
 
 def get_condition_v3(possible_conditions):
@@ -473,21 +502,34 @@ def get_condition_v3(possible_conditions):
 
 def get_condition_v4(doc, possible_conditions, possible_ors):
     doc_idx = [word.idx for word in doc]
+    keys = []
+    key_length = []
     for key in possible_conditions:
         if possible_conditions[key] != []:
-            possible_conditions_idx = [word.idx for word in possible_conditions[key][0]]
-            condition = flatten(possible_conditions[key])
+            keys.append(key)
+            key_length.append(len(possible_conditions[key][0]))
 
-            #if possible_ors['conj'] != [] and possible_ors['conj'][0][0].idx > possible_conditions[key][0][-1].idx:
-            if possible_ors['conj'] != []:
-                possible_ors_idx = [word.idx for word in possible_ors['conj'][0]]
-                # If the first conj word comes right after the condition part, append it
+    # Take the condition with highest len
+    key = keys[key_length.index(max(key_length))]
 
-                if (doc_idx.index(possible_conditions[key][0][-1].idx) - doc_idx.index(possible_ors['conj'][0][0].idx) == -1):
-                    for word in possible_ors['conj'][0]:
-                        condition.append(word)
-                    return condition, [key, 'conj']
-            return condition, [key]
+    # However, if the advcl key is not empty, take advcl as key
+    if 'advcl' in keys:
+        key = 'advcl'
+    elif 'prep' in keys:
+        key = 'prep'
+
+    possible_conditions_idx = [word.idx for word in possible_conditions[key][0]]
+    condition = flatten(possible_conditions[key])
+
+    if possible_ors['conj'] != []:
+        possible_ors_idx = [word.idx for word in possible_ors['conj'][0]]
+        # If the first conj word comes right after the condition part, append it
+
+        if (doc_idx.index(possible_conditions[key][0][-1].idx) - doc_idx.index(possible_ors['conj'][0][0].idx) == -1):
+            for word in possible_ors['conj'][0]:
+                condition.append(word)
+            return condition, [key, 'conj']
+    return condition, [key]
 
 def get_consequence_v3(doc, split_key):
     consequence = []
@@ -921,6 +963,50 @@ def extract_condition_consequence_4(doc):
 # ██      ██    ██ ██ ███ ██     ██      ██       ██  ██  ██      ██
 # ███████  ██████   ███ ███      ███████ ███████   ████   ███████ ███████
 
+# Removal of conditional words
+def remove_conditional_words(doc):
+    """
+    Always input a sentence, no list of word tokens
+    """
+    if 'spacy' in str(type(doc)).lower():
+        doc_string = doc.text
+    if condition_identifier(doc_string):
+
+        if_then_synonyms_words = ['if', 'whenever', 'wherever', 'when', 'unless', 'presuming']
+        if_then_synonyms_phrases = ['in the case that','assuming that', 'conceding that ', 'granted that', 'in case that', 'on the assumption that', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that', 'on condition that ', 'on the condition that', 'given that', 'if and only if ', 'presuming that', 'providing that', 'provided that', 'contingent on ', 'whenever that', 'in the event that']
+
+        # Check words
+        tokenized_sentence = [word for word in doc]
+        remove_index = []
+        for sentence_word in tokenized_sentence:
+            if sentence_word.text.lower() in if_then_synonyms_words:
+                for i in range(len(tokenized_sentence)):
+                    if tokenized_sentence[i].text.lower() in if_then_synonyms_words:
+                        remove_index.append(i)
+                return ' '.join([w.text for w in remove_elements(tokenized_sentence, remove_index)])
+            else:
+                for wordphrase in if_then_synonyms_phrases:
+                    if wordphrase in doc_string.lower():
+                        output = doc_string[:doc_string.lower().find(wordphrase)] + doc_string[doc_string.lower().find(wordphrase) + len(wordphrase):]
+                        return sp(output.strip())
+        return doc
+
+def remove_consequence_words(doc):
+    """
+    Always input a sentence, no list of word tokens
+    """
+    if 'spacy' in str(type(doc)).lower():
+        doc_string = doc.text
+    tokenized_sentence = [word for word in doc]
+    tokenized_sentence_strings = [word.text.lower() for word in doc]
+    if 'then' in tokenized_sentence_strings:
+        # Check words
+        remove_index = []
+        for i in range(len(tokenized_sentence)):
+            if tokenized_sentence[i].text.lower() == 'then':
+                remove_index.append(i)
+        return ' '.join([w.text for w in remove_elements(tokenized_sentence, remove_index)])
+    return doc
 
 ###################################################################################################
 # Functions for extraction of object and its condition
@@ -1029,8 +1115,8 @@ def get_object_condition(only_cond):
     condition = flatten(clean_low_level(condition))
     condition = remove_duplicate_chunks(condition)
     return {'object_or_person': flatten(object_or_person), 'c': condition, 'binder': (root, root.lemma_)}
-###################################################################################################
-###################################################################################################
+####################################################################################################
+####################################################################################################
 # Functions for extraction of object and its consequence
 def get_lower_level_cons(only_cons):
     only_cons_string = make_string(only_cons)
@@ -1074,7 +1160,21 @@ def get_object_consequence(consequence):
         consequence = remove_duplicate_chunks(consequence)
         return {'object_or_person': flatten(object_or_person), 'c': consequence, 'binder': (root, root.lemma_)}
 
-###################################################################################################
+
+def get_rule(low_cond, low_cons):
+    # Work on subjects, if 'it', 'he', 'their', 'her', 'them', 'its', 'they',
+    objects_persons = []
+    if len(low_cond['conds']) == len(low_cons['cons']):
+        for key in low_cond['conds']:
+            if
+    return objects_persons
+
+####################################################################################################
+
+testsentence = sp("If the customer is a business and the order size is less than 10, then the discount is 10%. Whenever the order is less than or equal to 10, discount is 15%. Lastly, the discount amounts to 5% if the customer is private.")
+
+for sent in [sent for sent in testsentence.sents]:
+    print(condition_consequence_extractor_v4(sent))
 
 
 
@@ -1400,14 +1500,6 @@ low_cons = get_lower_level_cons(cond_cons['consequence'])
 get_rule(low_cond, low_cons)
 
 
-def get_rule(low_cond, low_cons):
-    # Work on subjects, if 'it', 'he', 'their', 'her', 'them', 'its', 'they',
-    objects_persons = []
-    if len(low_cond['conds']) == len(low_cons['cons']):
-        for key in low_cond['conds']:
-            if
-    return objects_persons
-
 ###################################################################################################
 ###################################################################################################
 
@@ -1419,14 +1511,14 @@ temp_set = ['The car needs to be washed if it is blue.', 'The student needs to p
 if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
 if_then_synonyms_phrase = ['in the case that ','assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ', 'on condition that ', 'on the condition that ', 'given that ', 'if and only if ', 'presuming that ', 'presuming ', 'providing that ', 'provided that ', 'contingent on ', 'whenever that ', 'in the event that ']
 
-testsent_1 = "In case that the upcoming days are sunny salad should be bought."
-testsent_2 = "In the case that the upcoming days are sunny salad should be bought."
-testsent_3 = "Assuming that the upcoming days are sunny salad should be bought."
-testsent_4 = "Whenever the upcoming days are sunny salad should be bought."
-testsent_5 = "Conceding that the upcoming days are sunny salad should be bought."
-testsent_6 = "Given that the upcoming days are sunny salad should be bought."
-testsent_7 = "Provided that the upcoming days are sunny salad should be bought."
-testsent_8 = "Granted that the upcoming days are sunny salad should be bought."
+testsent_1 = "In case that the upcoming days are sunny, salad should be bought."
+testsent_2 = "In the case that the upcoming days are sunny, salad should be bought."
+testsent_3 = "Assuming that the upcoming days are sunny, salad should be bought."
+testsent_4 = "Whenever the upcoming days are sunny, salad should be bought."
+testsent_5 = "Conceding that the upcoming days are sunny, salad should be bought."
+testsent_6 = "Given that the upcoming days are sunny, salad should be bought."
+testsent_7 = "Provided that the upcoming days are sunny, salad should be bought."
+testsent_8 = "Granted that the upcoming days are sunny, salad should be bought."
 
 test_sent_root = "If the upcoming days are sunny, salad should be bought."
 
@@ -1460,64 +1552,84 @@ testlist = [testsent_1, testsent_2, testsent_3, testsent_4, testsent_5, testsent
 
 ########################################################################################################################################################################################################
 
-# Other tests
-else_synonyms_words = ['differently', 'otherwise', 'diversely', 'contrarily', 'elseways']
-else_synonyms_phrases = ['any other way', 'if not', 'in different circumstances', 'on the other hand', 'or else', 'or then']
-sent1 = 'If the legal status of the tax payer is married, then the social contributions amount to 35% of her gross income, otherwise to 42% of her gross income'
-sent2 = 'When the person is 30 years old, he needs to have a driver license, otherwise he needs an ID.'
-sent3 = 'Only premium customers can be permitted to vip longue.'
+# Implied logical sentences
+test1 = sp("A new employee receives a mobile phone.")
+test2 = sp("5 euros are always charged.")
+test3 = sp("Costs should always be compensated.")
+test4 = sp("Laptops are repared for free.")
+test5 = sp("Employees that achieved their goals always are rewarded.")
+test6 = sp("New customers should always receive a discount.")
+test7 = sp("A sick employee should always stay at home.")
+test8 = sp("Orders above 10 euro should be shipped for free.")
+test9 = sp("Orders below 10 euro have a shiping cost of 2 euro.")
+test10 = sp("Merchandise that was bought 4 months ago should be cleaned.")
 
+implieds = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10]
 
-sentss = sp('If the weather is in between 10 to 30 degrees, then the season is spring.')
+####################################################################################################
+testsss = sp("An employee should receive a bonus given that he achieved his yearly sales quota.")
 
-input_sentence4 = sp('If the employee has at least 15 but less than 30 years of service, 2 extra days are given.')
+####################################################################################################
 
+exsent_1 = sp("The order is not more than 30 units.")
+exsent_2 = sp("The order doesn't exceed more than 30 units.")
+exsent_3 = sp("The order isn't exceeding more than 30 units.")
+exsent_4 = sp("The order exceeds not more than 30 units.")
+exsent_5 = sp("The order won't exceed than 30 units.")
+exsent_6 = sp("The service request is not a bug.")
+exsent_7 = sp("The service request isn't a bug.")
+exsent_8 = sp("The service request does not constitute a bug.")
+exsent_9 = sp("The service request can't be seen as a bug.")
+exsent_10 = sp("The service request can not be a bug.")
 
-input_sentence3 = sp('Whenever a patient has the allergies and he is older than 18, then he needs to be diagnosed before medication.')
+not_sentences = [exsent_1, exsent_2, exsent_3, exsent_4, exsent_5, exsent_6, exsent_7, exsent_8, exsent_9, exsent_10]
+####################################################################################################
+# DEVELOPMENT OF LOWER LEVEL EXTRACTOR
 
+# Simple case ######################################################################################
 
-ex_sentence = sp('An employee should receive a bonus given that he achieved his yearly sales quotum.')
+# If X then Y
+sl_1 = "Whenever the order amount is 10, a discount of 2% will apply."
+# --> order amount = 10 --> discount = 2%
+sl_2 = "If the order amount is equal to 10, then a discount of 2% will be given."
+# --> order amount = 10 --> discount = 2%
+sl_3 = "Granted that the order amount is more than 10, a discount of 6% will apply."
+# --> order amount > 10 --> discount = 6%
+sl_4 = "No discount will apply in case that the order amount is less than 10."
+# --> order amount < 10 --> discount = None
+sl_5 = "If the order amount is between 10 and 20, the discount will be 7%."
+# --> order amount = [10, 20] --> discount = 7%
+sl_6 = "If the order amount is less than or equal to 40, a discount of 8% will apply."
+# --> order amount <= 40 --> discount = 8%
+sl_7 = "If the amount of the order is more than or equal to 30, a discount of 4% will be applied."
+# --> order amount >= 30 --> discount = 4%
 
-condition_consequence_extractor_v4(ex_sentence)
-
-
+sl_list = [sl_1, sl_2, sl_3, sl_4, sl_5, sl_6, sl_7]
+####################################################################################################
 # sentences_spacy['Dataset_1']
 # Test:
-for sentence in sentences_spacy['Dataset_4']:
-    print('--------------- NEXT SENTENCE -----------------')
+
+get_dep_parse(sp(sl_1))
+get_possible_conditions(sp(sl_1))
+
+count = 1
+for sentence in sl_list:
+    print('--------------- NEXT SENTENCE {} -----------------'.format(count))
+    count += 1
     print(sentence)
     temp_doc = sp(str(sentence))
-    #cond_cons1 = condition_consequence_extractor(temp_doc)
-    #cond_cons2 = condition_consequence_extractor_v3(temp_doc)
-    cond_cons3 = condition_consequence_extractor_v4(temp_doc)
-    #if cond_cons != 'No conditional statement in sentence':
-        #cond = cond_cons['condition']
-        #cons = cond_cons['consequence']
-        #only_cond = make_string(cond)
-        #only_cons = make_string(cons)
-        #print('High level rule: ', cond_cons)
+    cond_cons = condition_consequence_extractor_v4(temp_doc)
+    if cond_cons3 != 'No conditional statement in sentence':
+        cond = remove_conditional_words(make_string(cond_cons['condition']))
+        cons = remove_consequence_words(make_string(cond_cons['consequence']))
+        print('cond: ', cond)
+        print('cons: ', cons)
+        get_dep_parse(cons)
+        #print('High level rule: ', cond_cons3)
         #obj_cond = get_lower_level_cond(only_cond)
         #print('Lower level conditional: ', obj_cond)
         #obj_cons = get_lower_level_cons(only_cons)
         #print('Lower level consequence: ', obj_cons)
-    print(cond_cons3)
-    #else:
-        #print(cond_cons2)
+    else:
+        print(cond_cons3)
     print('-----------------------------------------------')
-
-testsentence = sp("An employee should receive a bonus given that he achieved his yearly sales quotum.")
-
-
-teeess = sp("A person may go to the toilet whenever she is beautiful, funny and can not hold her pee.")
-condition_consequence_extractor_v4(testsentence)
-
-testsentence2 = sp("Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny.")
-condition_consequence_extractor_v4(testsentence2)
-
-get_dep_parse(testsentence2)
-
-ssss = sp("In the case that the computer is reliable, the mouse is shipped with the present and an extra keyboard is added.")
-condition_consequence_extractor_v4(ssss)
-
-
-get_dep_parse(ssss)
