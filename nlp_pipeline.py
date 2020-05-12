@@ -404,6 +404,24 @@ def get_root(doc):
     return [el for el in doc if el.dep_=='ROOT'][0]
 
 
+def make_dict(list):
+    output_dict = {}
+    for el in list:
+        output_dict[el] = []
+    return output_dict
+
+
+def dict_empty(dictio):
+    for key in dictio:
+        if dictio[key] != []:
+            return False
+    return True
+
+
+def get_subtree(doc, tag):
+    for word in doc:
+        if word.dep_ == tag:
+            return [w for w in word.subtree]
 
 #  ██████  ██████  ███    ██ ██████  ██ ████████ ██  ██████  ███    ██
 # ██      ██    ██ ████   ██ ██   ██ ██    ██    ██ ██    ██ ████   ██
@@ -466,11 +484,28 @@ def condition_consequence_extractor_v3(doc):
         return 'No conditional statement in sentence'
 
 
+def get_other_part(doc, first_part):
+    doc_idx = [word.idx for word in doc]
+    first_part_idx = [word.idx for word in first_part]
+    output = []
+    for word in doc:
+        if word.idx not in first_part_idx:
+            output.append(word)
+    return output
+
+
 def condition_consequence_extractor_v4(doc):
     if condition_identifier(doc):
+        doc_dep_tags = [word.dep_ for word in doc]
         possible_conditions, possible_ors = get_possible_conditions(doc)
-        condition_part, split_keys = get_condition_v4(doc, possible_conditions, possible_ors)
-        consequence_part = get_consequence_v4(doc, split_keys)
+        # If the root indicates the consequence
+        if not dict_empty(possible_conditions) and 'relcl' not in doc_dep_tags:
+            condition_part, split_keys = get_condition_v4(doc, possible_conditions, possible_ors)
+            consequence_part = get_root_subtree_without_tagx(doc, split_keys)
+        else:
+            # If root indicates the condition
+            consequence_part = get_subtree(doc, 'relcl')
+            condition_part = get_other_part(doc, consequence_part)
         ############################################################################################
         # Probably not needed anymore
         # Perform cleaning on output:
@@ -478,15 +513,6 @@ def condition_consequence_extractor_v4(doc):
         disctinct_sentences = get_distinct_sentences_v2(condition_part, consequence_part)
         output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
 
-        if condition_part != output['condition'] or consequence_part != output['consequence']:
-            print('#############')
-            print('UNCLEANED AND CLEANED NOT EQUAL: ')
-            print('condition without cleaning: ', condition_part)
-            print('consequence without cleaning: ', consequence_part)
-            print('condition WITH cleaning: ', output['condition'])
-            print('consequence WITH cleaning: ', output['consequence'])
-            print('#############')
-        ############################################################################################
         return output
     else:
         print('No conditional statement in sentence')
@@ -553,7 +579,7 @@ def get_consequence_v3(doc, split_key):
     return consequence
 
 
-def get_consequence_v4(doc, split_keys):
+def get_root_subtree_without_tagx(doc, split_keys):
     consequence = []
     root_word = get_root(doc)
 
@@ -637,6 +663,67 @@ def get_possible_conditions(doc):
     return output_dict_conditions, output_dict_conditions_elses
 
 
+def get_possible_subtrees(doc, tag_list = ['advcl', 'ccomp', 'xcomp', 'prep', 'conj']):
+    """
+    Get all possible conditions using the [advcl, ccomp, xcomp, prep or conj] tags using the condition_identifier
+    """
+    dep_tags_split = tag_list
+    output_dict_conditions = make_dict(tag_list)
+    output_dict_conditions_elses = make_dict(tag_list)
+    consequence = []
+    dep_tag_words = [word for word in doc if word.dep_ in dep_tags_split]
+    doc_idx = [wi.idx for wi in doc]
+    for word in doc:
+        # Get all different condition possibilities
+        if word.dep_ in dep_tags_split:
+            string = ''
+            for w in [subtreeword for subtreeword in word.subtree]:
+                string += w.text + ' '
+            if condition_identifier(string):
+                output_dict_conditions[word.dep_].append([subtreeword for subtreeword in word.subtree])
+            # It's possible that the previous word is not accounted for, which could result in a false for the condition_identifier
+            elif not condition_identifier(string):
+                string = [w for w in word.ancestors][0].text + ' '
+                for w in [subtreeword for subtreeword in word.subtree]:
+                    string += w.text + ' '
+                if condition_identifier(string):
+                    output_dict_conditions[word.dep_].append([subtreeword for subtreeword in word.subtree])
+                #output_dict_conditions[word.dep_].append([subtreeword for subtreeword in word.subtree])
+            #elif else_identifier(string):
+            #    output_dict_conditions_elses[word.dep_].append([subtreeword for subtreeword in word.subtree])
+    # Append only the conjs originating from root, because those are more likely to be dislocated from the condition part and have more risk of being added to the consequence
+    for child in get_root(doc).children:
+        if child.dep_ == 'conj':
+            output_dict_conditions_elses[child.dep_].append([c for c in child.subtree])
+            # Also append any cc words that were left behind
+            for words in doc:
+                if words.dep_ == 'cc' and (doc_idx.index(words.idx) - doc_idx.index(output_dict_conditions_elses[child.dep_][0][0].idx) == -1):
+                    output_dict_conditions_elses[child.dep_][0].insert(0, words)
+
+    for word in doc:
+        append_conj_to_output = True
+        if word.dep_ == 'conj' and not condition_identifier(string):
+            # Get dislocated conjunction parts too (not in the condition part)
+            list_to_append = [subtreeword for subtreeword in word.subtree]
+
+            # Check whether none of the words appear in other already found parts
+            found_condition_idx_list = []
+            for key in output_dict_conditions_elses:
+                for element in output_dict_conditions_elses[key]:
+                    for wordidx in element:
+                        found_condition_idx_list.append(wordidx.idx)
+            for el in list_to_append:
+                if el.idx in found_condition_idx_list:
+                    append_conj_to_output = False
+            # Also append any adjoining ands or ors or advmods
+            if append_conj_to_output:
+                for words in doc:
+                    if words.dep_ == 'cc' and (doc_idx.index(words.idx) - doc_idx.index(list_to_append[0].idx) == -1):
+                        list_to_append.insert(0, words)
+                output_dict_conditions_elses[word.dep_].append(list_to_append)
+    return output_dict_conditions, output_dict_conditions_elses
+
+
 def condition_identifier(sentence):
     # if_then_synonyms_words = ['if', 'whenever', 'wherever', 'then', 'when', 'unless']
     # if_then_synonyms_phrase = ['assuming that ', 'conceding that ', 'granted that ', 'in case that ', 'on the assumption that ', 'supposing that ', 'in case of ', 'in the case of ', 'in the case that ']
@@ -661,18 +748,18 @@ def condition_identifier(sentence):
 
 
 def else_identifier(sentence):
-    else_synonyms_words = ['differently', 'otherwise', 'diversely', 'contrarily', 'elseways']
+    else_synonyms_words = ['differently', 'otherwise', 'diversely', 'contrarily', 'elseways', 'else']
     else_synonyms_phrases = ['any other way ', 'if not ', 'in different circumstances ', 'on the other hand ', 'or else ', 'or then ']
 
     # Check words
     for sentence_word in nltk.word_tokenize(sentence):
         if sentence_word.lower() in else_synonyms_words:
-            return True
+            return True, sentence_word
         else:
             for wordphrase in else_synonyms_phrases:
                 if wordphrase in sentence.lower():
-                    return True
-    return False
+                    return True, wordphrase
+    return False, None
 
 
 ####################################################################################################
@@ -988,8 +1075,8 @@ def remove_conditional_words(doc):
                 for wordphrase in if_then_synonyms_phrases:
                     if wordphrase in doc_string.lower():
                         output = doc_string[:doc_string.lower().find(wordphrase)] + doc_string[doc_string.lower().find(wordphrase) + len(wordphrase):]
-                        return sp(output.strip())
-        return doc
+                        return output.strip()
+        return doc.text
 
 def remove_consequence_words(doc):
     """
@@ -1006,7 +1093,7 @@ def remove_consequence_words(doc):
             if tokenized_sentence[i].text.lower() == 'then':
                 remove_index.append(i)
         return ' '.join([w.text for w in remove_elements(tokenized_sentence, remove_index)])
-    return doc
+    return doc.text
 
 ###################################################################################################
 # Functions for extraction of object and its condition
@@ -1522,6 +1609,8 @@ testsent_8 = "Granted that the upcoming days are sunny, salad should be bought."
 
 test_sent_root = "If the upcoming days are sunny, salad should be bought."
 
+testsents = [testsent_1, testsent_2, testsent_3, testsent_4, testsent_5, testsent_6, testsent_7, testsent_8]
+
 ####################################################################################################
 # PRELIMINARY RESEARCH PART 2 ######################################################################
 ####################################################################################################
@@ -1603,33 +1692,259 @@ sl_6 = "If the order amount is less than or equal to 40, a discount of 8% will a
 # --> order amount <= 40 --> discount = 8%
 sl_7 = "If the amount of the order is more than or equal to 30, a discount of 4% will be applied."
 # --> order amount >= 30 --> discount = 4%
+sl_8 = "If the customer ordered more than or equal to 30, a discount of 4% will be applied."
+# --> order amount >= 30 --> discount = 4%
+sl_9 = "If the customer's order is greater than or equal to 30, a discount of 4% will be applied."
+# --> order amount >= 30 --> discount = 4%
 
-sl_list = [sl_1, sl_2, sl_3, sl_4, sl_5, sl_6, sl_7]
+sl_list = [sl_1, sl_2, sl_3, sl_4, sl_5, sl_6, sl_7, sl_8, sl_9]
+
+####################################################################################################
+
+validation = ["If the mouse is red then it should be washed.", "Whenever the day is Sunday, the discount is 10%.", "In case that the laptop is green, the ball is red.", "When it is weekend, the shop does not open.", "If the temperature is between 5 and 10 degrees, then the ice should be refrigerated."]
+
 ####################################################################################################
 # sentences_spacy['Dataset_1']
 # Test:
 
-get_dep_parse(sp(sl_1))
-get_possible_conditions(sp(sl_1))
-
-count = 1
-for sentence in sl_list:
-    print('--------------- NEXT SENTENCE {} -----------------'.format(count))
-    count += 1
+sentences_spacy['Dataset_8']
+# A discount of 4% and otherwise 9% is given when the order exceeds 10 units.
+for sentence in ["Whenever the customer is in the testing phase, and the customer's service request is a change request, the cost is 600 euros."]:
+    print('----- NEXT SENTENCE -----')
     print(sentence)
-    temp_doc = sp(str(sentence))
-    cond_cons = condition_consequence_extractor_v4(temp_doc)
-    if cond_cons3 != 'No conditional statement in sentence':
-        cond = remove_conditional_words(make_string(cond_cons['condition']))
-        cons = remove_consequence_words(make_string(cond_cons['consequence']))
-        print('cond: ', cond)
-        print('cons: ', cons)
-        get_dep_parse(cons)
-        #print('High level rule: ', cond_cons3)
-        #obj_cond = get_lower_level_cond(only_cond)
-        #print('Lower level conditional: ', obj_cond)
-        #obj_cons = get_lower_level_cons(only_cons)
-        #print('Lower level consequence: ', obj_cons)
+    if 'spacy' not in str(type(sentence)).lower():
+        sentence = sp(sentence)
+    cond_cons = condition_consequence_extractor_v4(sentence)
+    cond = sp(remove_conditional_words(make_string(cond_cons['condition'])))
+    cons = sp(remove_consequence_words(make_string(cond_cons['consequence'])))
+    #get_dep_parse(cond)
+    #get_dep_parse(cons)
+    print('--cond--')
+    print(cond)
+    print('--cons--')
+    print(cons)
+    print('RULE:')
+    print(get_full_dmn_rule(sentence))
+
+
+
+def split_in_conjs(doc):
+    doc_dep_tags = [w.dep_ for w in doc]
+    doc_pos_tags = [w.pos_ for w in doc]
+    # Conjunctions? or Disjunctions?
+    # -- If there is no conjunction tag, return the original doc
+    if 'conj' not in doc_dep_tags:
+        return doc
     else:
-        print(cond_cons3)
-    print('-----------------------------------------------')
+        # Split in possible conjunctions
+        while 'conj' in 
+        conj = [get_subtree(doc, 'conj')]
+        return 'DONE'
+
+
+def get_full_dmn_rule(doc):
+    rule = {'if':[], 'then':[], 'else':[]}
+    conds, conss, elses, else_part = [], [], [], []
+
+    #  Step 1: get the cond, cons and else parts
+    cond_cons = condition_consequence_extractor_v4(doc)
+    cond, cons = sp(remove_conditional_words(make_string(cond_cons['condition']))), sp(remove_consequence_words(make_string(cond_cons['consequence'])))
+    else_in_cons, else_syn = else_identifier(str(cons))
+    if else_in_cons:
+        cons, else_part = extract_else_phrase(cons, else_syn)
+
+    # Step 2: split up the conds and cons in its elements (conjunction/disjunction)
+    # -- Step 2.a for the cond
+    print('--------------------------')
+    print(split_in_conjs(cond))
+    conds.append(cond)
+
+    # -- Step 2.b for the cons
+    print(split_in_conjs(cons))
+    conss.append(cons)
+
+    # -- Step 2.c for the else
+    print(split_in_conjs(else_part))
+    elses.append(else_part)
+    print('--------------------------')
+
+    # Step 3: Extract and append the rule notations to the appropriate key in dict
+    # -- 3.a ifs
+    for c in conds:
+        rule['if'].append(get_lower_level_rule(c))
+    # -- 3.b thens
+    for c in conss:
+        rule['then'].append(get_lower_level_rule(c))
+    # -- 3.c elses
+    for c in elses:
+        rule['else'].append(get_lower_level_rule(c))
+    return rule
+
+
+def extract_else_phrase(cons, else_syn):
+    if len([sent for sent in cons.sents]) == 1:
+        principal_part = [word for word in cons[:[w.text.lower() for w in cons].index(else_syn)]]
+        else_part = get_other_part(cons, principal_part)
+    else:
+        principal_part = [sent for sent in cons.sents][0]
+        else_part = [sent for sent in cons.sents][1]
+    return make_string(principal_part), make_string(else_part)
+
+
+def num_or_nom(doc):
+    pos_tags = [w.pos_ for w in doc]
+    for pos in pos_tags:
+        if pos == 'NUM':
+            return 'NUM'
+    return 'NOM'
+
+
+def get_lower_level_rule(doc):
+    if doc != []:
+        if num_or_nom(doc) == 'NUM':
+            return get_dmn_rule_num(doc)
+        elif num_or_nom(doc) == 'NOM':
+            return get_dmn_rule_nom(doc)
+    else:
+        return doc
+
+
+# No conjunctions --> If A = a then B = b
+def get_dmn_rule_num(doc):
+    doc_idx = [w.idx for w in doc]
+    possible_vars = []
+    possible_vals = []
+    possible_verbs = []
+    rule_sign = get_rule_sign(doc)
+    root_word = get_root(doc)
+    doc_dep_tags = [w.dep_ for w in doc]
+    #print('---')
+    # If there's only one element in the doc, then it's probably the value itself
+    #if 'nsubj' not in doc_dep_tags and 'nsubjpass' not in doc_dep_tags:
+    #    possible_vals.append([w for w in doc if w.pos_ in ['NOUN', 'ADJ', 'NUM']])
+    #    return possible_vars, rule_sign, possible_vals
+
+    # Parse over the sentence and append every word to the right list
+    if root_word.pos_ == 'NOUN':
+        possible_vars.append(root_word)
+        for w in doc:
+            if w.dep_ in ['attr', 'pobj', 'acomp', 'dobj', 'nsubj']:
+                    possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN']])
+    elif 'dobj' not in doc_dep_tags and 'pobj' not in doc_dep_tags and 'attr' not in doc_dep_tags:
+        for w in doc:
+            if w.dep_ == 'nsubj' or w.dep_ == 'nsubjpass':
+                possible_vals.append([wi for wi in w.subtree])
+    else:
+        for w in doc:
+            if w.pos_ in ['VERB', 'AUX']:
+                possible_verbs.append({'word': w, 'lemma': sp(w.lemma_), 'id': w.idx, 'index': doc_idx.index(w.idx)})
+                if sp(w.lemma_)[0].pos_ == 'NOUN':
+                    possible_vars.append([sp(w.lemma_)])
+            # Append possible vars
+            elif w.dep_ in ['nsubj', 'nsubjpass']:
+                possible_vars.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'PRON']])
+            # Append possible vals
+            elif w.dep_ in ['attr', 'pobj', 'acomp', 'dobj']:
+                possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN']])
+    #flatten all intermediate outputs before cleaning them
+    possible_vars = flatten(possible_vars)
+    possible_vals = flatten(possible_vals)
+    #print('vars: ', possible_vars)
+    #print('vals: ', possible_vals)
+    if possible_vals == []:
+        possible_vars.append([possible_verbs_i['lemma'] for possible_verbs_i in possible_verbs])
+        possible_vals = get_true_or_false(doc)
+        possible_vars = flatten(possible_vars)[-1]
+    elif len(possible_vals) > 1:
+        possible_vals = clean_vals(possible_vals)
+    possible_vars = flatten(possible_vars)
+
+    return possible_vars, rule_sign, possible_vals
+
+
+def get_dmn_rule_nom(doc):
+    doc_idx = [w.idx for w in doc]
+    possible_vars = []
+    possible_vals = []
+    possible_verbs = []
+    rule_sign = get_rule_sign(doc)
+    root_word = get_root(doc)
+    doc_dep_tags = [w.dep_ for w in doc]
+    #print('---')
+    # If there's only one element in the doc, then it's probably the value itself
+    #print(doc_dep_tags)
+    if 'nsubj' not in doc_dep_tags and 'nsubjpass' not in doc_dep_tags:
+        possible_vals.append([w for w in doc if w.pos_ in ['NOUN', 'ADJ', 'NUM']])
+        return possible_vars, rule_sign, possible_vals
+
+    # Parse over the sentence and append every word to the right list
+    for w in doc:
+        if w.pos_ in ['VERB', 'AUX']:
+            possible_verbs.append({'word': w, 'lemma': sp(w.lemma_), 'id': w.idx, 'index': doc_idx.index(w.idx)})
+            if sp(w.lemma_)[0].pos_ == 'NOUN':
+                possible_vars.append([sp(w.lemma_)])
+        # Append possible vars
+        elif w.dep_ in ['nsubj', 'nsubjpass']:
+            possible_vars.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'PRON']])
+        # Append possible vals
+        elif w.dep_ in ['attr', 'pobj', 'acomp', 'dobj']:
+            possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN']])
+    #flatten all intermediate outputs before cleaning them
+    possible_vars = flatten(possible_vars)
+    possible_vals = flatten(possible_vals)
+    #print('vars: ', possible_vars)
+    #print('vals: ', possible_vals)
+    if possible_vals == []:
+        possible_vars.append([possible_verbs_i['lemma'] for possible_verbs_i in possible_verbs])
+        possible_vals = get_true_or_false(doc)
+        possible_vars = flatten(possible_vars)[-1]
+    elif len(possible_vals) > 1:
+        possible_vals = clean_vals(possible_vals)
+    possible_vars = flatten(possible_vars)
+
+    return possible_vars, rule_sign, possible_vals
+# No conjunctions --> If A = a then B = b else B = c
+
+
+def get_true_or_false(doc):
+    for w in doc:
+        if w.dep_ == 'neg':
+            return False
+        elif 'no' in [w.text.lower() for w in doc]:
+            return False
+    return True
+
+
+def clean_vals(possible_vals):
+    possible_vals_idx = [w.idx for w in possible_vals]
+    for i in possible_vals_idx:
+        if possible_vals_idx.count(i) > 1:
+            return possible_vals[possible_vals_idx.index(i)]
+    possible_vals_str = ' '.join([w.text for w in possible_vals])
+    for sent in ['great than equal', 'more than equal', 'less than equal', 'great than', 'more than', 'less than']:
+        if sent in possible_vals_str:
+            return possible_vals_str[possible_vals_str.find() + len(sent):]
+    return possible_vals
+
+
+def get_rule_sign(doc):
+    doc_text = ' '.join([w.lemma_ for w in doc]).lower()
+    less_than_syns = ['less than', 'few than', "do n't exceed ", "do 'nt surmount ", "don't pass "]
+    less_equal_syns = ['less than or equal', 'less than or equal']
+    greater_than_syns = ['great than', 'more than', 'exceed ', 'surmount ', ' pass ', 'be above']
+    great_equal_syns = ['great than or equal', 'more than or equal']
+    if 'between ' in doc_text or 'within ' in doc_text or 'interval ' in doc_text:
+        return '[X, Y]'
+    for great_equal in great_equal_syns:
+        if great_equal in doc_text:
+            return '>='
+    for great_syn in greater_than_syns:
+        if great_syn in doc_text:
+            return '>'
+    for less_equal in less_equal_syns:
+        if less_equal in doc_text:
+            return '=<'
+    for less_syn in less_than_syns:
+        if less_syn in doc_text:
+            return '<'
+    return '='
