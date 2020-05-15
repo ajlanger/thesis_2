@@ -914,6 +914,8 @@ def get_full_dmn_rule(doc):
     else_part = []
     #  Step 1: get the cond, cons and else parts
     cond_cons = condition_consequence_extractor_v4(doc)
+    if cond_cons == 'No conditional statement in sentence':
+        return get_lower_level_rule_v2(doc)
     cond, cons = sp(remove_conditional_words(make_string(cond_cons['condition']))), sp(remove_consequence_words(make_string(cond_cons['consequence'])))
     cond, cons = remove_link_words(cond), remove_link_words(cons)
     else_in_cons, else_syn = else_identifier(str(cons))
@@ -936,16 +938,13 @@ def get_full_dmn_rule(doc):
     # Step 3: Extract and append the rule notations to the appropriate key in dict
     # -- 3.a ifs
     for c in conds:
-        print('New IF: ', get_lower_level_rule_v2(c))
-        rule['if'].append(get_lower_level_rule(c))
+        rule['if'].append(get_lower_level_rule_v2(c))
     # -- 3.b thens
     for c in conss:
-        print('New THEN: ', get_lower_level_rule_v2(c))
-        rule['then'].append(get_lower_level_rule(c))
+        rule['then'].append(get_lower_level_rule_v2(c))
     # -- 3.c elses
     for c in elses:
-        print('New ELSE: ', get_lower_level_rule_v2(c))
-        rule['else'].append(get_lower_level_rule(c))
+        rule['else'].append(get_lower_level_rule_v2(c))
     return rule
 
 
@@ -1000,7 +999,7 @@ def clean_vals(possible_vals):
 
 def get_rule_sign(doc):
     doc_text = ' '.join([w.lemma_ for w in doc]).lower()
-    less_than_syns = ['less than', 'few than', "do n't exceed ", "do 'nt surmount ", "don't pass ", 'young than']
+    less_than_syns = ['less than', 'few than', "do n't exceed ", "do 'nt surmount ", "don't pass ", 'young than', 'low than']
     less_equal_syns = ['less than or equal', 'less than or equal']
     greater_than_syns = ['great than', 'more than', 'exceed ', 'surmount ', ' pass ', 'be above', 'old than']
     great_equal_syns = ['great than or equal', 'more than or equal']
@@ -1069,96 +1068,54 @@ def remove_conditional_words(doc):
         return doc.text
 
 
-def get_dmn_rule_num(doc):
-    doc_idx = [w.idx for w in doc]
-    possible_vars = []
-    possible_vals = []
-    possible_verbs = []
+def get_lower_level_rule_v2(doc):
+    if doc == []:
+        return []
+    get_dep_parse(doc)
     rule_sign = get_rule_sign(doc)
-    root_word = get_root(doc)
-    doc_dep_tags = [w.dep_ for w in doc]
-    # Parse over the sentence and append every word to the right list
+    vars = []
+    vals = []
     if rule_sign == 'interval':
-        # To correctly assign between values
         for word in doc:
-            if word.pos_ == 'NUM':
-                possible_vals.append(word)
+            if word.pos_ in ['NUM']:
+                vals.append(word)
             elif word.pos_ in ['NOUN', 'ADJ']:
-                possible_vars.append(word)
-
-    elif root_word.pos_ == 'NOUN':
-        possible_vars.append(root_word)
-        for w in doc:
-            if w.dep_ in ['attr', 'pobj', 'acomp', 'dobj', 'nsubj']:
-                    possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN']])
-    elif 'dobj' not in doc_dep_tags and 'pobj' not in doc_dep_tags and 'attr' not in doc_dep_tags:
-        for w in doc:
-            if w.dep_ == 'nsubj' or w.dep_ == 'nsubjpass':
-                possible_vals.append([wi for wi in w.subtree])
+                vars.append(word)
     else:
+        for word in doc:
+            if word.dep_ in ['nsubjpass','nsubj']:
+                vars.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ']])
+            elif word.dep_ in ['dobj', 'pobj', 'attr', 'acomp']:
+                vals.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN', 'VERB']])
+            # For action sentences
+            elif word.dep_ in ['xcomp']:
+                vars.append([w for w in word.subtree if w.pos_ in ['VERB']])
+    vars = flatten(vars)
+    vals = flatten(vals)
+    if 'NUM' in [w.pos_ for w in doc] and 'NUM' not in [w.pos_ for w in vars] and 'NUM' not in [w.pos_ for w in vals]:
         for w in doc:
-            if w.pos_ in ['VERB', 'AUX']:
-                possible_verbs.append({'word': w, 'lemma': sp(w.lemma_), 'id': w.idx, 'index': doc_idx.index(w.idx)})
-                if sp(w.lemma_)[0].pos_ == 'NOUN':
-                    possible_vars.append([sp(w.lemma_)])
-            # Append possible vars
-            elif w.dep_ in ['nsubj', 'nsubjpass']:
-                possible_vars.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'PRON']])
-            # Append possible vals
-            elif w.dep_ in ['attr', 'pobj', 'acomp', 'dobj']:
-                possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'NUM', 'PROPN']])
-    #flatten all intermediate outputs before cleaning them
-    possible_vars = flatten(possible_vars)
-    possible_vals = flatten(possible_vals)
-    if possible_vals == []:
-        possible_vars.append([possible_verbs_i['lemma'] for possible_verbs_i in possible_verbs])
-        possible_vals = get_true_or_false(doc)
-        possible_vars = flatten(possible_vars)[-1]
-    elif len(possible_vals) > 1:
-        possible_vals = remove_duplicate_chunks(possible_vals)
-    possible_vars = flatten(possible_vars)
+            if w.pos_ in ['NUM']:
+                vars.append(w)
+    if vars == [] and vals == []:
+        vars = [w for w in doc if w.pos_ in ['ADJ', 'NOUN', 'NUM']]
 
-    return possible_vars, rule_sign, possible_vals
+    if sp(get_root(doc).lemma_)[0].pos_ == 'NOUN' and (vals == [] or vars == []):
+        vars.append(get_root(doc))
+    if 'NUM' in [el.pos_ for el in flatten(vars)] and flatten(vals) != []:
+        vars, vals = vals, vars
+    if flatten(vals) == []:
+        rule_sign = '='
+        vals = get_true_or_false(doc)
+    elif flatten(vars) == []:
+        rule_sign = '='
+        vars = vals
+        vals = get_true_or_false(doc)
+    if type(vals) == list and vals != []:
+        vals = remove_duplicate_chunks(flatten([vals]))
+    if type(vars) == list and vars != []:
+        vars = remove_duplicate_chunks(flatten([vars]))
+    return vars, rule_sign, vals
 
-
-def get_dmn_rule_nom(doc):
-    #get_dep_parse(doc)
-    doc_idx = [w.idx for w in doc]
-    possible_vars = []
-    possible_vals = []
-    possible_verbs = []
-    rule_sign = get_rule_sign(doc)
-    root_word = get_root(doc)
-    doc_dep_tags = [w.dep_ for w in doc]
-    # If there's only one element in the doc, then it's probably the value itself
-    if 'nsubj' not in doc_dep_tags and 'nsubjpass' not in doc_dep_tags:
-        possible_vals.append([w for w in doc if w.pos_ in ['NOUN', 'ADJ', 'NUM']])
-        return possible_vars, rule_sign, possible_vals
-
-    # Parse over the sentence and append every word to the right list
-    for w in doc:
-        if w.pos_ in ['VERB', 'AUX']:
-            possible_verbs.append({'word': w, 'lemma': sp(w.lemma_), 'id': w.idx, 'index': doc_idx.index(w.idx)})
-            if sp(w.lemma_)[0].pos_ == 'NOUN':
-                possible_vars.append([sp(w.lemma_)])
-        # Append possible vars
-        if w.dep_ in ['nsubj', 'nsubjpass']:
-            possible_vars.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'PRON', 'PROPN', 'VERB']])
-        # Append possible vals
-        if w.dep_ in ['attr', 'pobj', 'acomp', 'dobj']:
-            possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN']])
-    #flatten all intermediate outputs before cleaning them
-    possible_vars = flatten(possible_vars)
-    possible_vals = flatten(possible_vals)
-    if possible_vals == []:
-        if possible_vars == []:
-            possible_vars.append([possible_verbs_i['lemma'] for possible_verbs_i in possible_verbs])
-        possible_vals = get_true_or_false(doc)
-    elif len(possible_vals) > 1:
-        possible_vals = remove_duplicate_chunks(possible_vals)
-    possible_vars = flatten(possible_vars)
-
-    return possible_vars, rule_sign, possible_vals
 
 ####################################################################################################
 
@@ -1208,66 +1165,18 @@ for sentence in sentences_spacy['Dataset_8']:
         #print('')
         #print('LOW LEVEL')
         dictiona = get_full_dmn_rule(sentence)
-        print(dictiona)
-        #print('IF: ', dictiona['if'])
-        #print('THEN: ', dictiona['then'])
-        #print('ELSE: ', dictiona['else'])
+        #print(dictiona)
+        print('IF: ', dictiona['if'])
+        print('THEN: ', dictiona['then'])
+        print('ELSE: ', dictiona['else'])
         # print(dictiona['binder_if'], dictiona['binder_then'], dictiona['binder_else'])
     else:
         print(cond_cons)
         #print(get_lower_level_rule(sentence))
         print('')
 
-input_sentence = sp("In case that the score is 5, then the service request is a bug, otherwise it is a product change.")
+input_sentence = sp("If the employee has at least 15 but less than 30 years of service, 2 extra days are given.")
 get_dep_parse(input_sentence)
 get_possible_conditions(input_sentence)
 condition_consequence_extractor_v4(input_sentence)
 get_full_dmn_rule(input_sentence)
-
-
-def get_lower_level_rule_v2(doc):
-    if doc == []:
-        return []
-    rule_sign = get_rule_sign(doc)
-    vars = []
-    vals = []
-    if rule_sign == 'interval':
-        for word in doc:
-            if word.pos_ in ['NUM']:
-                vals.append(word)
-            elif word.pos_ in ['NOUN', 'ADJ']:
-                vars.append(word)
-    else:
-        for word in doc:
-            if word.dep_ in ['nsubjpass','nsubj']:
-                vars.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ']])
-            elif word.dep_ in ['dobj', 'pobj', 'attr', 'acomp']:
-                vals.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN']])
-            # For action sentences
-            elif word.dep_ in ['xcomp']:
-                vars.append([w for w in word.subtree if w.pos_ in ['VERB']])
-    vars = flatten(vars)
-    vals = flatten(vals)
-    if 'NUM' in [w.pos_ for w in doc] and 'NUM' not in [w.pos_ for w in vars] and 'NUM' not in [w.pos_ for w in vals]:
-        for w in doc:
-            if w.pos_ in ['NUM']:
-                vars.append(w)
-    if vars == [] and vals == []:
-        vars = [w for w in doc if w.pos_ in ['ADJ', 'NOUN', 'NUM']]
-
-    if sp(get_root(doc).lemma_)[0].pos_ == 'NOUN' and (vals == [] or vars == []):
-        vars.append(get_root(doc))
-    if 'NUM' in [el.pos_ for el in flatten(vars)] and flatten(vals) != []:
-        vars, vals = vals, vars
-    if flatten(vals) == []:
-        rule_sign = '='
-        vals = get_true_or_false(doc)
-    elif flatten(vars) == []:
-        rule_sign = '='
-        vars = vals
-        vals = get_true_or_false(doc)
-    if type(vals) == list and vals != []:
-        vals = remove_duplicate_chunks(flatten([vals]))
-    if type(vars) == list and vars != []:
-        vars = remove_duplicate_chunks(flatten([vars]))
-    return vars, rule_sign, vals
