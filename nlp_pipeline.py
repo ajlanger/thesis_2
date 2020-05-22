@@ -431,6 +431,8 @@ def remove_puncts_v2(doc_list):
 
 def flatten(nested_list):
     flat_list = []
+    if type(nested_list) != list:
+        return nested_list
     for sublist in nested_list:
         if type(sublist) == list:
             for item in sublist:
@@ -442,6 +444,8 @@ def flatten(nested_list):
             return flatten(flat_list)
     return flat_list
 
+#####################################################################################
+#####################################################################################
 # %% HIGH LEVEL
 #  ██████  ██████  ███    ██ ██████  ██ ████████ ██  ██████  ███    ██
 # ██      ██    ██ ████   ██ ██   ██ ██    ██    ██ ██    ██ ████   ██
@@ -460,6 +464,8 @@ def flatten(nested_list):
 # ███████ ██ ██   ███ ███████     ██      █████   ██    ██ █████   ██
 # ██   ██ ██ ██    ██ ██   ██     ██      ██       ██  ██  ██      ██
 # ██   ██ ██  ██████  ██   ██     ███████ ███████   ████   ███████ ███████
+#####################################################################################
+#####################################################################################
 
 def implied_condition_consequence_extractor(doc):
     """
@@ -490,18 +496,21 @@ def implied_condition_consequence_extractor(doc):
 
 
 def condition_consequence_extractor_v3(doc):
-    if condition_identifier(doc):
-        possible_conditions, possible_ors = get_possible_conditions(doc)
-        condition_part, split_key = get_condition_v3(possible_conditions)
-        consequence_part = get_consequence_v3(doc, split_key)
-        # Perform cleaning on output:
-        output = {'condition': remove_duplicate_chunks(condition_part), 'consequence': remove_duplicate_chunks(consequence_part)}
-        disctinct_sentences = get_distinct_sentences(condition_part, consequence_part)
-        output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
+    try:
+        if condition_identifier(doc):
+            possible_conditions, possible_ors = get_possible_conditions(doc)
+            condition_part, split_key = get_condition_v3(possible_conditions)
+            consequence_part = get_consequence_v3(doc, split_key)
+            # Perform cleaning on output:
+            output = {'condition': remove_duplicate_chunks(condition_part), 'consequence': remove_duplicate_chunks(consequence_part)}
+            disctinct_sentences = get_distinct_sentences(condition_part, consequence_part)
+            output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
 
-        return output
-    else:
-        return 'No conditional statement in sentence'
+            return output
+        else:
+            return 'No conditional statement in sentence'
+    except:
+        return 'No conditional statements could be extracted in spite of a condition being present.'
 
 
 def condition_consequence_extractor_v4(doc):
@@ -808,7 +817,8 @@ def else_identifier(sentence):
                 if wordphrase in sentence.lower():
                     return True, wordphrase
     return False, None
-
+#####################################################################################
+#####################################################################################
 # %% Low level
 #  ██████  ██████  ███    ██ ██████  ██ ████████ ██  ██████  ███    ██
 # ██      ██    ██ ████   ██ ██   ██ ██    ██    ██ ██    ██ ████   ██
@@ -827,6 +837,8 @@ def else_identifier(sentence):
 # ██      ██    ██ ██  █  ██     ██      █████   ██    ██ █████   ██
 # ██      ██    ██ ██ ███ ██     ██      ██       ██  ██  ██      ██
 # ███████  ██████   ███ ███      ███████ ███████   ████   ███████ ███████
+#####################################################################################
+#####################################################################################
 
 def valid_phrase(distinct_conj):
     pos_tags = [el.pos_ for el in distinct_conj]
@@ -908,12 +920,14 @@ def remove_link_words(doc):
             return output
     return doc
 
+get_full_dmn_rule(sp("If the amount is between 20 and 30 units, give a discount."))
+
 
 def get_full_dmn_rule(doc):
     rule = {'if':[], 'then':[], 'else':[]}
     else_part = []
     #  Step 1: get the cond, cons and else parts
-    cond_cons = condition_consequence_extractor_v4(doc)
+    cond_cons = condition_consequence_extractor_v3(doc)
     if cond_cons == 'No conditional statement in sentence':
         return get_lower_level_rule_v2(doc)
     cond, cons = sp(remove_conditional_words(make_string(cond_cons['condition']))), sp(remove_consequence_words(make_string(cond_cons['consequence'])))
@@ -979,10 +993,10 @@ def get_lower_level_rule(doc):
 def get_true_or_false(doc):
     for w in doc:
         if w.dep_ == 'neg':
-            return False
+            return 'False'
         elif 'no' in [w.text.lower() for w in doc]:
-            return False
-    return True
+            return 'False'
+    return 'True'
 
 
 def clean_vals(possible_vals):
@@ -1001,10 +1015,10 @@ def get_rule_sign(doc):
     doc_text = ' '.join([w.lemma_ for w in doc]).lower()
     less_than_syns = ['less than', 'few than', "do n't exceed ", "do 'nt surmount ", "don't pass ", 'young than', 'low than']
     less_equal_syns = ['less than or equal', 'less than or equal']
-    greater_than_syns = ['great than', 'more than', 'exceed ', 'surmount ', ' pass ', 'be above', 'old than']
+    greater_than_syns = ['great than', 'more than', 'exceed ', 'surmount ', ' pass ', 'be above', 'old than', 'long than']
     great_equal_syns = ['great than or equal', 'more than or equal']
-    if 'between ' in doc_text or 'within ' in doc_text or 'interval ' in doc_text:
-        return 'interval'
+    if 'between ' in doc_text or 'be within ' in doc_text or 'in ' in doc_text:
+        return 'in'
     if 'neg' in [w.dep_ for w in doc]:
         return '!='
     for great_equal in great_equal_syns:
@@ -1071,11 +1085,10 @@ def remove_conditional_words(doc):
 def get_lower_level_rule_v2(doc):
     if doc == []:
         return []
-    get_dep_parse(doc)
     rule_sign = get_rule_sign(doc)
     vars = []
     vals = []
-    if rule_sign == 'interval':
+    if rule_sign == 'in':
         for word in doc:
             if word.pos_ in ['NUM']:
                 vals.append(word)
@@ -1090,6 +1103,8 @@ def get_lower_level_rule_v2(doc):
             # For action sentences
             elif word.dep_ in ['xcomp']:
                 vars.append([w for w in word.subtree if w.pos_ in ['VERB']])
+    if get_root(doc).pos_ == 'NOUN':
+        vals.append(get_root(doc))
     vars = flatten(vars)
     vals = flatten(vals)
     if 'NUM' in [w.pos_ for w in doc] and 'NUM' not in [w.pos_ for w in vars] and 'NUM' not in [w.pos_ for w in vals]:
@@ -1110,11 +1125,121 @@ def get_lower_level_rule_v2(doc):
         rule_sign = '='
         vars = vals
         vals = get_true_or_false(doc)
+    """
     if type(vals) == list and vals != []:
         vals = remove_duplicate_chunks(flatten([vals]))
     if type(vars) == list and vars != []:
         vars = remove_duplicate_chunks(flatten([vars]))
+    if vals != True and vals != False:
+        vals = str(make_string(vals))
+        if vals[0] in '1234567890':
+            vals = float(vals)
+    vars = str(make_string(vars))
+    """
     return vars, rule_sign, vals
+
+#####################################################################################
+#####################################################################################
+# ████████ ███████ ███████ ████████ ██ ███    ██  ██████
+#    ██    ██      ██         ██    ██ ████   ██ ██
+#    ██    █████   ███████    ██    ██ ██ ██  ██ ██   ███
+#    ██    ██           ██    ██    ██ ██  ██ ██ ██    ██
+#    ██    ███████ ███████    ██    ██ ██   ████  ██████
+#####################################################################################
+#####################################################################################
+
+def calculate_f_score(precision, recall):
+    f_score = 2 * (precision*recall)/(precision+recall)
+    return f_score
+
+
+def get_precision_recall(actual_identified, identified, total):
+    return round(actual_identified/identified, 3), round(actual_identified/total, 3)
+
+
+def make_tuple(el):
+    output_list = []
+    for element in el:
+        temp_tuple = []
+        for e in element.split(','):
+            if 'True' in e.replace('(', '').replace(')', '').strip():
+                temp_tuple.append('True')
+            elif 'False' in e.replace('(', '').replace(')', '').strip():
+                temp_tuple.append('False')
+            #elif e.replace('(', '').replace(')', '').strip()[0] in '0123456789':
+            #    temp_tuple.append(float(e.replace('(', '').replace(')', '').strip()))
+            elif e.replace('(', '').replace(')', '').strip()[0] == '[' and e.replace('(', '').replace(')', '').strip()[-1] == ']':
+                interval = []
+                for n in e.replace('(', '').replace(')', '').strip().split('..'):
+                    interval.append(n)
+                temp_tuple.append(interval)
+            elif e.replace('(', '').replace(')', '').strip() in '=,!=,>,<,>=,=<,in':
+                temp_tuple.append(e.replace('(', '').replace(')', '').strip())
+            else:
+                temp_tuple.append(e.replace('(', '').replace(')', '').strip().split(' '))
+        output_list.append(tuple(temp_tuple))
+    return output_list
+
+
+def create_float(string):
+    output = ''
+    for letter in string:
+        if letter in '1234567890':
+            output += letter
+    return float(output)
+
+
+def format_column(column):
+    # input : test_data['Low_else']
+    all_lows = []
+    for el in column:
+        if el == 'None':
+            all_lows.append(None)
+        else:
+
+            temp_list = []
+            splitted = el.split('),')
+            for element in splitted:
+                if element[-1] == ')':
+                    temp_list.append(element.strip())
+                else:
+                    temp_list.append((element + ')').strip())
+            all_lows.append(make_tuple(temp_list))
+    return all_lows
+
+
+def count_rules(rule_list):
+    count = 0
+    for el in rule_list:
+        if el != None:
+            for i in el:
+                count += 1
+    return count
+
+
+def extract_vars_vals_signs(row='', rowname='low_if', segment='if', extracted_low_level=''):
+    extracted_vars = []
+    extracted_vals = []
+    extracted_signs = []
+    desired_vars = []
+    desired_vals = []
+    desired_signs = []
+    if extracted_low_level[segment][0] != []:
+        for ifs in extracted_low_level[segment]:
+            extracted_vars.append([word.text for word in flatten(ifs[0])])
+            extracted_signs.append([flatten(ifs[1])])
+            if type(ifs[2]) == list:
+                extracted_vals.append([word.text for word in flatten(ifs[2])])
+            else:
+                extracted_vals.append([ifs[2]])
+    for ifs in row[rowname]:
+        desired_vars.append([word for word in flatten(ifs[0])])
+        desired_signs.append([flatten(ifs[1])])
+        if type(ifs[2]) == list:
+            desired_vals.append([word for word in flatten(ifs[2])])
+        else:
+            desired_vals.append([ifs[2]])
+    return extracted_vars, extracted_vals, extracted_signs, desired_vars, desired_vals, desired_signs
 
 
 ####################################################################################################
@@ -1141,9 +1266,10 @@ only_sentences = get_only_sentences(temp_list)
 # ....... with spaCy
 
 sentences_spacy = get_spacy_lib(only_sentences)
-
+sp("If the amount is between 20 and 30 units, give a discount.")
+sentences_spacy['Dataset_2']
 # A discount of 4% and otherwise 9% is given when the order exceeds 10 units.
-for sentence in sentences_spacy['Dataset_8']:
+for sentence in sentences_spacy['Dataset_2']:
     print('######################################################')
     #print('')
     print('----- NEXT SENTENCE -----')
@@ -1158,25 +1284,402 @@ for sentence in sentences_spacy['Dataset_8']:
         #print(cond_cons)
         cond = sp(remove_conditional_words(make_string(cond_cons['condition'])))
         cons = sp(remove_consequence_words(make_string(cond_cons['consequence'])))
-        #print('--cond--')
-        #print(cond)
-        #print('--cons--')
-        #print(cons)
-        #print('')
-        #print('LOW LEVEL')
+        print('--cond--')
+        print(cond)
+        print('--cons--')
+        print(cons)
+        print('')
+        print('LOW LEVEL')
         dictiona = get_full_dmn_rule(sentence)
         #print(dictiona)
         print('IF: ', dictiona['if'])
         print('THEN: ', dictiona['then'])
         print('ELSE: ', dictiona['else'])
+
         # print(dictiona['binder_if'], dictiona['binder_then'], dictiona['binder_else'])
     else:
-        print(cond_cons)
+        print(get_lower_level_rule_v2(sentence))
+        #print(cond_cons)
         #print(get_lower_level_rule(sentence))
         print('')
 
-input_sentence = sp("If the employee has at least 15 but less than 30 years of service, 2 extra days are given.")
-get_dep_parse(input_sentence)
-get_possible_conditions(input_sentence)
-condition_consequence_extractor_v4(input_sentence)
-get_full_dmn_rule(input_sentence)
+"""
+Customers with a premium card should always be admitted to the lounge.
+In case that the stock runs out, replenish it on a monthly base.
+The inventory should be counted every two days.
+The inventory should be counted every three days whenever it's a holiday.
+A promotion should be given every day of the week.
+In case of bad weather, do not sell any icecream.
+If the weather is sunny, sell icecream, else sell waffles.
+If the student has bad marks and is suspended, remove the student from the database.
+If the person is between 10 and 20 years old, he is permitted to the park, otherwise not.
+If the amount is between 20 and 30 units, give a discount.
+"""
+get_full_dmn_rule(sp("If the amount is between 20 and 30 units, give a discount."))['if'][0]
+get_dep_parse(sp("If the amount is between 20 and 30 units, give a discount."))
+####################################################################################################
+# Testing phase ####################################################################################
+
+
+test_data = pd.read_csv(r"textual_data/test_data_csv.csv", sep=';')
+
+desired_if_rules = format_column(test_data['Low_if'])
+desired_then_rules = format_column(test_data['Low_then'])
+desired_else_rules = format_column(test_data['Low_else'])
+
+test_data['low_if'] = desired_if_rules
+test_data['low_then'] = desired_then_rules
+test_data['low_else'] = desired_else_rules
+
+desired_total_ifs = count_rules(desired_if_rules)
+desired_total_thens = count_rules(desired_then_rules)
+desired_total_elses = count_rules(desired_else_rules)
+
+# Actual identified
+actual_identified_conditions = 0
+actual_identified_consequences = 0
+actual_identified_ifs_vars = 0
+actual_identified_thens_vars = 0
+actual_identified_elses_vars = 0
+actual_identified_ifs_vals = 0
+actual_identified_thens_vals = 0
+actual_identified_elses_vals = 0
+actual_identified_if_signs = 0
+actual_identified_then_signs = 0
+actual_identified_else_signs = 0
+
+# Identified concepts
+identified_conditions = 0
+identified_consequences = 0
+identified_ifs_vars = 0
+identified_thens_vars = 0
+identified_elses_vars = 0
+identified_ifs_vals = 0
+identified_thens_vals = 0
+identified_elses_vals = 0
+identified_if_signs = 0
+identified_then_signs = 0
+identified_else_signs = 0
+
+for index, row in test_data.iterrows():
+    total_sentences += 1
+    # Automatic extraction
+    extracted_cond_cons = condition_consequence_extractor_v3(sp(row['Sentences']))
+    # Desired extractions
+    desired_condition = row['Condition'].split(' ')
+    desired_consequence = row['Consequence'].split(' ')
+    # -----------------------------------------------------------------------------
+    # Condition and consequences
+    if extracted_cond_cons not in ['No conditional statements could be extracted in spite of a condition being present.', 'No conditional statement in sentence']:
+        extracted_low_level = get_full_dmn_rule(sp(row['Sentences']))
+        # -------------------------------------------------------------------------
+        # identified conditions ---------------------------------------------------
+        identified_conditions += 1
+        extr_condition = [w.text for w in extracted_cond_cons['condition']]
+        cond_identified = True
+        for w in desired_condition:
+            if w not in extr_condition:
+                cond_identified = False
+        if cond_identified:
+            actual_identified_conditions += 1
+        # -------------------------------------------------------------------------
+        # identified consequences -------------------------------------------------
+        identified_consequences += 1
+        extr_consequence = [w.text for w in extracted_cond_cons['consequence']]
+        cons_identified = True
+        for w in desired_consequence:
+            if w not in extr_consequence:
+                cons_identified = False
+        if cons_identified:
+            actual_identified_consequences += 1
+
+        # -------------------------------------------------------------------------
+        # identified IFS ----------------------------------------------------------
+        extracted_vars, extracted_vals, extracted_signs, desired_vars, desired_vals, desired_signs = extract_vars_vals_signs(row, 'low_if', 'if', extracted_low_level)
+
+        if len(extracted_vars) == len(desired_vars):
+            for i in range(len(extracted_vars)):
+                # IF Vars
+                vars_identified = True
+                identified_ifs_vars += 1
+                for element in desired_vars[i]:
+                    if element not in extracted_vars[i]:
+                        vars_identified = False
+                if vars_identified:
+                    actual_identified_ifs_vars += 1
+
+                # IF Vals
+                vals_identified = True
+                identified_ifs_vals += 1
+                for element in desired_vals[i]:
+                    if element not in extracted_vals[i]:
+                        vals_identified = False
+                if vals_identified:
+                    actual_identified_ifs_vals += 1
+
+                # IF signs
+                signs_identified = True
+                identified_if_signs += 1
+                for element in desired_signs[i]:
+                    if element not in extracted_signs[i]:
+                        signs_identified = False
+                if signs_identified:
+                    actual_identified_if_signs += 1
+        else:
+            all_vars_extracted = flatten(extracted_vars)
+            all_vals_extracted = flatten(extracted_vals)
+            all_signs_extracted = flatten(extracted_signs)
+            all_vars_desired = flatten(desired_vars)
+            all_vals_desired = flatten(desired_vals)
+            all_signs_desired = flatten(desired_signs)
+
+            # IF Vars
+            vars_identified = True
+            identified_ifs_vars += 1
+            for element in all_vars_desired:
+                if element not in all_vars_extracted:
+                    vars_identified = False
+            if vars_identified:
+                actual_identified_ifs_vars += 1
+
+            # IF Vals
+            vals_identified = True
+            identified_ifs_vals += 1
+            for element in all_vals_desired:
+                if element not in all_vals_extracted:
+                    vals_identified = False
+            if vals_identified:
+                actual_identified_ifs_vals += 1
+
+            # IF signs
+            signs_identified = True
+            identified_if_signs += 1
+            for element in all_signs_desired:
+                if element not in all_signs_extracted:
+                    signs_identified = False
+            if signs_identified:
+                actual_identified_if_signs += 1
+
+        # -------------------------------------------------------------------------
+        # identified THENS ----------------------------------------------------------
+        extracted_vars, extracted_vals, extracted_signs, desired_vars, desired_vals, desired_signs = extract_vars_vals_signs(row, 'low_then', 'then', extracted_low_level)
+
+        if len(extracted_vars) == len(desired_vars):
+            for i in range(len(extracted_vars)):
+                # Then Vars
+                vars_identified = True
+                identified_thens_vars += 1
+                for element in desired_vars[i]:
+                    if element not in extracted_vars[i]:
+                        vars_identified = False
+                if vars_identified:
+                    actual_identified_thens_vars += 1
+
+                # Then Vals
+                vals_identified = True
+                identified_thens_vals += 1
+                for element in desired_vals[i]:
+                    if element not in extracted_vals[i]:
+                        vals_identified = False
+                if vals_identified:
+                    actual_identified_thens_vals += 1
+
+                # Then signs
+                signs_identified = True
+                identified_then_signs += 1
+                for element in desired_signs[i]:
+                    if element not in extracted_signs[i]:
+                        signs_identified = False
+                if signs_identified:
+                    actual_identified_then_signs += 1
+        else:
+            all_vars_extracted = flatten(extracted_vars)
+            all_vals_extracted = flatten(extracted_vals)
+            all_signs_extracted = flatten(extracted_signs)
+            all_vars_desired = flatten(desired_vars)
+            all_vals_desired = flatten(desired_vals)
+            all_signs_desired = flatten(desired_signs)
+
+            # Then Vars
+            vars_identified = True
+            identified_thens_vars += 1
+            for element in all_vars_desired:
+                if element not in all_vars_extracted:
+                    vars_identified = False
+            if vars_identified:
+                actual_identified_thens_vars += 1
+
+            # Then Vals
+            vals_identified = True
+            identified_thens_vals += 1
+            for element in all_vals_desired:
+                if element not in all_vals_extracted:
+                    vals_identified = False
+            if vals_identified:
+                actual_identified_thens_vals += 1
+
+            # Then signs
+            signs_identified = True
+            identified_then_signs += 1
+            for element in all_signs_desired:
+                if element not in all_signs_extracted:
+                    signs_identified = False
+            if signs_identified:
+                actual_identified_then_signs += 1
+
+        # -------------------------------------------------------------------------
+        # identified ELSES ----------------------------------------------------------
+        if row['low_else'] != None:
+            extracted_vars, extracted_vals, extracted_signs, desired_vars, desired_vals, desired_signs = extract_vars_vals_signs(row, 'low_else', 'else', extracted_low_level)
+
+            if len(extracted_vars) == len(desired_vars):
+                for i in range(len(extracted_vars)):
+                    # Then Vars
+                    vars_identified = True
+                    identified_elses_vars += 1
+                    for element in desired_vars[i]:
+                        if element not in extracted_vars[i]:
+                            vars_identified = False
+                    if vars_identified:
+                        actual_identified_elses_vars += 1
+
+                    # Then Vals
+                    vals_identified = True
+                    identified_elses_vals += 1
+                    for element in desired_vals[i]:
+                        if element not in extracted_vals[i]:
+                            vals_identified = False
+                    if vals_identified:
+                        actual_identified_elses_vals += 1
+
+                    # Then signs
+                    signs_identified = True
+                    identified_else_signs += 1
+                    for element in desired_signs[i]:
+                        if element not in extracted_signs[i]:
+                            signs_identified = False
+                    if signs_identified:
+                        actual_identified_else_signs += 1
+            else:
+                all_vars_extracted = flatten(extracted_vars)
+                all_vals_extracted = flatten(extracted_vals)
+                all_signs_extracted = flatten(extracted_signs)
+                all_vars_desired = flatten(desired_vars)
+                all_vals_desired = flatten(desired_vals)
+                all_signs_desired = flatten(desired_signs)
+
+                # Then Vars
+                vars_identified = True
+                identified_elses_vars += 1
+                for element in all_vars_desired:
+                    if element not in all_vars_extracted:
+                        vars_identified = False
+                if vars_identified:
+                    actual_identified_elses_vars += 1
+
+                # Then Vals
+                vals_identified = True
+                identified_elses_vals += 1
+                for element in all_vals_desired:
+                    if element not in all_vals_extracted:
+                        vals_identified = False
+                if vals_identified:
+                    actual_identified_elses_vals += 1
+
+                # Then signs
+                signs_identified = True
+                identified_else_signs += 1
+                for element in all_signs_desired:
+                    if element not in all_signs_extracted:
+                        signs_identified = False
+                if signs_identified:
+                    actual_identified_else_signs += 1
+
+#################################################################################################
+# HIGH LEVEL RESULTS ############################################################################
+#################################################################################################
+# Calculation of precision - cond --> actual_identified_conditions/identified_conditions
+# Calculation of recall - cond --> actual_identified_conditions/total_real_conditions
+cond_precision, cond_recall = get_precision_recall(actual_identified_conditions, identified_conditions, 92)
+
+print('cond_precision: ', cond_precision)
+print('cond_recall: ', cond_recall)
+
+cond_f_score = calculate_f_score(cond_precision, cond_recall)
+
+# Calculation of precision - cons --> actual_identified_consequences/identified_consequences
+# Calculation of recall - cons --> actual_identified_consequences/total_real_consequences
+cons_precision, cons_recall = get_precision_recall(actual_identified_consequences, identified_consequences, 92)
+
+print('cons_precision: ', cons_precision)
+print('cons_recall: ', cons_recall)
+
+cons_f_score = calculate_f_score(cons_precision, cons_recall)
+
+#################################################################################################
+# LOW LEVEL RESULTS #############################################################################
+#################################################################################################
+# If vars, vals & signs -------------------------------------------------------------
+if_var_precision, if_var_recall = get_precision_recall(actual_identified_ifs_vars, identified_ifs_vars, desired_total_ifs)
+print('if_variables_precision: ', if_var_precision)
+print('if_variables_recall: ', if_var_recall)
+if_var_f_score = calculate_f_score(if_var_precision, if_var_recall)
+
+if_val_precision, if_val_recall = get_precision_recall(actual_identified_ifs_vals, identified_ifs_vals, desired_total_ifs)
+print('if_values_precision: ', if_val_precision)
+print('if_values_recall: ', if_val_recall)
+if_val_f_score = calculate_f_score(if_val_precision, if_val_recall)
+
+if_sign_precision, if_sign_recall = get_precision_recall(actual_identified_if_signs, identified_if_signs, desired_total_ifs)
+print('if_sign_precision: ', if_sign_precision)
+print('if_sign_recall: ', if_sign_recall)
+if_sign_f_score = calculate_f_score(if_sign_precision, if_sign_recall)
+
+if_f_score = (if_var_f_score + if_val_f_score + if_sign_f_score)/3
+
+# THEN vars, vals & signs -------------------------------------------------------------
+then_var_precision, then_var_recall = get_precision_recall(actual_identified_thens_vars, identified_thens_vars, desired_total_thens)
+print('then_variables_precision: ', then_var_precision)
+print('then_variables_recall: ', then_var_recall)
+then_var_f_score = calculate_f_score(then_var_precision, then_var_recall)
+
+then_val_precision, then_val_recall = get_precision_recall(actual_identified_thens_vals, identified_thens_vals, desired_total_thens)
+print('then_values_precision: ', then_val_precision)
+print('then_values_recall: ', then_val_recall)
+then_val_f_score = calculate_f_score(then_val_precision, then_val_recall)
+
+then_sign_precision, then_sign_recall = get_precision_recall(actual_identified_then_signs, identified_then_signs, desired_total_thens)
+print('then_sign_precision: ', then_sign_precision)
+print('then_sign_recall: ', then_sign_recall)
+then_sign_f_score = calculate_f_score(then_sign_precision, then_sign_recall)
+
+then_f_score = (then_var_f_score + then_val_f_score + then_sign_f_score)/3
+
+# ELSE vars, vals & signs -------------------------------------------------------------
+else_var_precision, else_var_recall = get_precision_recall(actual_identified_elses_vars, identified_elses_vars, desired_total_elses)
+print('else_variables_precision: ', else_var_precision)
+print('else_variables_recall: ', else_var_recall)
+else_var_f_score = calculate_f_score(else_var_precision, else_var_recall)
+
+else_val_precision, else_val_recall = get_precision_recall(actual_identified_elses_vals, identified_elses_vals, desired_total_elses)
+print('else_values_precision: ', else_val_precision)
+print('else_values_recall: ', else_val_recall)
+else_val_f_score = calculate_f_score(else_val_precision, else_val_recall)
+
+else_sign_precision, else_sign_recall = get_precision_recall(actual_identified_else_signs, identified_else_signs, desired_total_elses)
+print('else_sign_precision: ', else_sign_precision)
+print('else_sign_recall: ', else_sign_recall)
+else_sign_f_score = calculate_f_score(else_sign_precision, else_sign_recall)
+
+else_f_score = (else_var_f_score + else_val_f_score + else_sign_f_score)/3
+
+##########################################################################################
+# OVERALL F-SCORE
+high_level_extractor_f_score = (cond_f_score+cons_f_score)/2
+high_level_extractor_f_score
+
+low_level_extractor_f_score = (if_f_score+then_f_score+else_f_score)/3
+low_level_extractor_f_score
+
+overall_f_score = (high_level_extractor_f_score + low_level_extractor_f_score)/2
+overall_f_score
