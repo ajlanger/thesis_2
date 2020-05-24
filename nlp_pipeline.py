@@ -920,8 +920,6 @@ def remove_link_words(doc):
             return output
     return doc
 
-get_full_dmn_rule(sp("If the amount is between 20 and 30 units, give a discount."))
-
 
 def get_full_dmn_rule(doc):
     rule = {'if':[], 'then':[], 'else':[]}
@@ -1017,7 +1015,7 @@ def get_rule_sign(doc):
     less_equal_syns = ['less than or equal', 'less than or equal']
     greater_than_syns = ['great than', 'more than', 'exceed ', 'surmount ', ' pass ', 'be above', 'old than', 'long than']
     great_equal_syns = ['great than or equal', 'more than or equal']
-    if 'between ' in doc_text or 'be within ' in doc_text or 'in ' in doc_text:
+    if ('between ' in doc_text or 'be within ' in doc_text or 'in ' in doc_text):
         return 'in'
     if 'neg' in [w.dep_ for w in doc]:
         return '!='
@@ -1097,7 +1095,7 @@ def get_lower_level_rule_v2(doc):
     else:
         for word in doc:
             if word.dep_ in ['nsubjpass','nsubj']:
-                vars.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ']])
+                vars.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ', 'PROPN']])
             elif word.dep_ in ['dobj', 'pobj', 'attr', 'acomp']:
                 vals.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN', 'VERB']])
             # For action sentences
@@ -1125,17 +1123,6 @@ def get_lower_level_rule_v2(doc):
         rule_sign = '='
         vars = vals
         vals = get_true_or_false(doc)
-    """
-    if type(vals) == list and vals != []:
-        vals = remove_duplicate_chunks(flatten([vals]))
-    if type(vars) == list and vars != []:
-        vars = remove_duplicate_chunks(flatten([vars]))
-    if vals != True and vals != False:
-        vals = str(make_string(vals))
-        if vals[0] in '1234567890':
-            vals = float(vals)
-    vars = str(make_string(vars))
-    """
     return vars, rule_sign, vals
 
 #####################################################################################
@@ -1226,17 +1213,17 @@ def extract_vars_vals_signs(row='', rowname='low_if', segment='if', extracted_lo
     desired_signs = []
     if extracted_low_level[segment][0] != []:
         for ifs in extracted_low_level[segment]:
-            extracted_vars.append([word.text for word in flatten(ifs[0])])
+            extracted_vars.append([word.text.lower() for word in flatten(ifs[0])])
             extracted_signs.append([flatten(ifs[1])])
             if type(ifs[2]) == list:
-                extracted_vals.append([word.text for word in flatten(ifs[2])])
+                extracted_vals.append([word.text.lower() for word in flatten(ifs[2])])
             else:
                 extracted_vals.append([ifs[2]])
     for ifs in row[rowname]:
-        desired_vars.append([word for word in flatten(ifs[0])])
+        desired_vars.append([word.lower() for word in flatten(ifs[0])])
         desired_signs.append([flatten(ifs[1])])
         if type(ifs[2]) == list:
-            desired_vals.append([word for word in flatten(ifs[2])])
+            desired_vals.append([word.lower() for word in flatten(ifs[2])])
         else:
             desired_vals.append([ifs[2]])
     return extracted_vars, extracted_vals, extracted_signs, desired_vars, desired_vals, desired_signs
@@ -1265,6 +1252,11 @@ only_sentences = get_only_sentences(temp_list)
 # %% Split into single sentences -------------------------------------------------------------------
 # ....... with spaCy
 
+if_vars = []
+if_vals_1 = []
+if_vals_2 = []
+then_vars = []
+then_vals = []
 sentences_spacy = get_spacy_lib(only_sentences)
 sp("If the amount is between 20 and 30 units, give a discount.")
 sentences_spacy['Dataset_2']
@@ -1292,6 +1284,13 @@ for sentence in sentences_spacy['Dataset_2']:
         print('LOW LEVEL')
         dictiona = get_full_dmn_rule(sentence)
         #print(dictiona)
+        if_vals_1.append((dictiona['if'][0][1], dictiona['if'][0][2]))
+        if_vals_2.append((dictiona['if'][1][1], dictiona['if'][1][2]))
+        if_vars.append(dictiona['if'][0][0])
+        if_vars.append(dictiona['if'][1][0])
+        for then_part in dictiona['then']:
+            then_vars.append(then_part[0])
+            then_vals.append((then_part[1], then_part[2]))
         print('IF: ', dictiona['if'])
         print('THEN: ', dictiona['then'])
         print('ELSE: ', dictiona['else'])
@@ -1302,6 +1301,13 @@ for sentence in sentences_spacy['Dataset_2']:
         #print(cond_cons)
         #print(get_lower_level_rule(sentence))
         print('')
+
+# Make pandas DataFrame
+columns = [str(make_string(if_vars[0])), str(make_string(if_vars[1])), str(make_string(then_vars[0]))]
+
+pd_dict = {columns[0]: if_vals_1, columns[1]: if_vals_2, columns[2]: then_vals}
+
+pd.DataFrame(pd_dict)
 
 """
 Customers with a premium card should always be admitted to the lounge.
@@ -1315,13 +1321,32 @@ If the student has bad marks and is suspended, remove the student from the datab
 If the person is between 10 and 20 years old, he is permitted to the park, otherwise not.
 If the amount is between 20 and 30 units, give a discount.
 """
-get_full_dmn_rule(sp("If the amount is between 20 and 30 units, give a discount."))['if'][0]
-get_dep_parse(sp("If the amount is between 20 and 30 units, give a discount."))
+
+test1 = sp("A new employee receives a mobile phone.")
+test2 = sp("5 euros are always charged.")
+test3 = sp("Costs should always be compensated.")
+test4 = sp("Laptops are repared for free.")
+test5 = sp("Employees that achieved their goals always are rewarded.")
+test6 = sp("New customers should always receive a discount.")
+test7 = sp("A sick employee should always stay at home.")
+test8 = sp("Orders above 10 euro should be shipped for free.")
+test9 = sp("Orders below 10 euro have a shiping cost of 2 euro.")
+test10 = sp("Merchandise that was bought 4 months ago should be cleaned.")
+
+implieds = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10]
+
+for el in implieds:
+    print(get_full_dmn_rule(el))
+
+get_dep_parse(sp("otherwise discount is 6%."))
+
+get_full_dmn_rule(sp("otherwise discount is 6%."))
+
 ####################################################################################################
 # Testing phase ####################################################################################
 
 
-test_data = pd.read_csv(r"textual_data/test_data_csv.csv", sep=';')
+test_data = pd.read_csv(r"textual_data/test_data_csv_v2.csv", sep=';')
 
 desired_if_rules = format_column(test_data['Low_if'])
 desired_then_rules = format_column(test_data['Low_then'])
@@ -1334,7 +1359,9 @@ test_data['low_else'] = desired_else_rules
 desired_total_ifs = count_rules(desired_if_rules)
 desired_total_thens = count_rules(desired_then_rules)
 desired_total_elses = count_rules(desired_else_rules)
-
+desired_total_ifs
+desired_total_thens
+desired_total_elses
 # Actual identified
 actual_identified_conditions = 0
 actual_identified_consequences = 0
@@ -1360,8 +1387,19 @@ identified_elses_vals = 0
 identified_if_signs = 0
 identified_then_signs = 0
 identified_else_signs = 0
-
+mistakes = 0
+total_sentences = 0
 for index, row in test_data.iterrows():
+    print('---------')
+    print('SENTENCE: ', row['Sentences'])
+    print('full desired: ')
+    print(row['low_if'], row['low_then'], row['low_else'])
+    print('full extracted: ')
+    try:
+        print(get_full_dmn_rule(sp(row['Sentences'])))
+    except:
+        print('not able to extract')
+    print('--')
     total_sentences += 1
     # Automatic extraction
     extracted_cond_cons = condition_consequence_extractor_v3(sp(row['Sentences']))
@@ -1405,6 +1443,11 @@ for index, row in test_data.iterrows():
                 for element in desired_vars[i]:
                     if element not in extracted_vars[i]:
                         vars_identified = False
+                        print('LOW IF')
+                        print('Desired: ', element)
+                        print('full desired: ', desired_vars[i])
+                        print('full extracted: ', extracted_vars[i])
+                        mistakes += 1
                 if vars_identified:
                     actual_identified_ifs_vars += 1
 
@@ -1414,6 +1457,11 @@ for index, row in test_data.iterrows():
                 for element in desired_vals[i]:
                     if element not in extracted_vals[i]:
                         vals_identified = False
+                        print('LOW IF')
+                        print('Desired: ', element)
+                        print('full desired: ', desired_vals[i])
+                        print('full extracted: ', extracted_vals[i])
+                        mistakes += 1
                 if vals_identified:
                     actual_identified_ifs_vals += 1
 
@@ -1423,6 +1471,7 @@ for index, row in test_data.iterrows():
                 for element in desired_signs[i]:
                     if element not in extracted_signs[i]:
                         signs_identified = False
+                        mistakes += 1
                 if signs_identified:
                     actual_identified_if_signs += 1
         else:
@@ -1438,6 +1487,11 @@ for index, row in test_data.iterrows():
             identified_ifs_vars += 1
             for element in all_vars_desired:
                 if element not in all_vars_extracted:
+                    print('LOW IF')
+                    print('Desired: ', element)
+                    print('full desired: ', all_vars_desired)
+                    print('full extracted: ', all_vars_extracted)
+                    mistakes += 1
                     vars_identified = False
             if vars_identified:
                 actual_identified_ifs_vars += 1
@@ -1448,6 +1502,11 @@ for index, row in test_data.iterrows():
             for element in all_vals_desired:
                 if element not in all_vals_extracted:
                     vals_identified = False
+                    print('LOW IF')
+                    print('Desired: ', element)
+                    print('full desired: ', all_vals_desired)
+                    print('full extracted: ', all_vals_extracted)
+                    mistakes += 1
             if vals_identified:
                 actual_identified_ifs_vals += 1
 
@@ -1457,6 +1516,7 @@ for index, row in test_data.iterrows():
             for element in all_signs_desired:
                 if element not in all_signs_extracted:
                     signs_identified = False
+                    mistakes += 1
             if signs_identified:
                 actual_identified_if_signs += 1
 
@@ -1472,6 +1532,11 @@ for index, row in test_data.iterrows():
                 for element in desired_vars[i]:
                     if element not in extracted_vars[i]:
                         vars_identified = False
+                        print('LOW THEN')
+                        print('Desired: ', element)
+                        print('full desired: ', desired_vars[i])
+                        print('full extracted: ', extracted_vars[i])
+                        mistakes += 1
                 if vars_identified:
                     actual_identified_thens_vars += 1
 
@@ -1481,6 +1546,11 @@ for index, row in test_data.iterrows():
                 for element in desired_vals[i]:
                     if element not in extracted_vals[i]:
                         vals_identified = False
+                        print('LOW THEN')
+                        print('Desired: ', element)
+                        print('full desired: ', desired_vals[i])
+                        print('full extracted: ', extracted_vals[i])
+                        mistakes += 1
                 if vals_identified:
                     actual_identified_thens_vals += 1
 
@@ -1490,6 +1560,7 @@ for index, row in test_data.iterrows():
                 for element in desired_signs[i]:
                     if element not in extracted_signs[i]:
                         signs_identified = False
+                        mistakes += 1
                 if signs_identified:
                     actual_identified_then_signs += 1
         else:
@@ -1506,6 +1577,11 @@ for index, row in test_data.iterrows():
             for element in all_vars_desired:
                 if element not in all_vars_extracted:
                     vars_identified = False
+                    print('LOW THEN')
+                    print('Desired: ', element)
+                    print('full desired: ', all_vars_desired)
+                    print('full extracted: ', all_vars_extracted)
+                    mistakes += 1
             if vars_identified:
                 actual_identified_thens_vars += 1
 
@@ -1515,6 +1591,11 @@ for index, row in test_data.iterrows():
             for element in all_vals_desired:
                 if element not in all_vals_extracted:
                     vals_identified = False
+                    print('LOW THEN')
+                    print('Desired: ', element)
+                    print('full desired: ', all_vals_desired)
+                    print('full extracted: ', all_vals_extracted)
+                    mistakes += 1
             if vals_identified:
                 actual_identified_thens_vals += 1
 
@@ -1524,6 +1605,7 @@ for index, row in test_data.iterrows():
             for element in all_signs_desired:
                 if element not in all_signs_extracted:
                     signs_identified = False
+                    mistakes += 1
             if signs_identified:
                 actual_identified_then_signs += 1
 
@@ -1534,30 +1616,41 @@ for index, row in test_data.iterrows():
 
             if len(extracted_vars) == len(desired_vars):
                 for i in range(len(extracted_vars)):
-                    # Then Vars
+                    # Else Vars
                     vars_identified = True
                     identified_elses_vars += 1
                     for element in desired_vars[i]:
                         if element not in extracted_vars[i]:
                             vars_identified = False
+                            print('LOW ELSE')
+                            print('Desired: ', element)
+                            print('full desired: ', desired_vars[i])
+                            print('full extracted: ', extracted_vars[i])
+                            mistakes += 1
                     if vars_identified:
                         actual_identified_elses_vars += 1
 
-                    # Then Vals
+                    # Else Vals
                     vals_identified = True
                     identified_elses_vals += 1
                     for element in desired_vals[i]:
                         if element not in extracted_vals[i]:
                             vals_identified = False
+                            print('LOW ELSE')
+                            print('Desired: ', element)
+                            print('full desired: ', desired_vals[i])
+                            print('full extracted: ', extracted_vals[i])
+                            mistakes += 1
                     if vals_identified:
                         actual_identified_elses_vals += 1
 
-                    # Then signs
+                    # Else signs
                     signs_identified = True
                     identified_else_signs += 1
                     for element in desired_signs[i]:
                         if element not in extracted_signs[i]:
                             signs_identified = False
+                            mistakes += 1
                     if signs_identified:
                         actual_identified_else_signs += 1
             else:
@@ -1568,32 +1661,44 @@ for index, row in test_data.iterrows():
                 all_vals_desired = flatten(desired_vals)
                 all_signs_desired = flatten(desired_signs)
 
-                # Then Vars
+                # Else Vars
                 vars_identified = True
                 identified_elses_vars += 1
                 for element in all_vars_desired:
                     if element not in all_vars_extracted:
                         vars_identified = False
+                        print('LOW ELSE')
+                        print('Desired: ', element)
+                        print('full desired: ', all_vars_desired)
+                        print('full extracted: ', all_vars_extracted)
+                        mistakes += 1
                 if vars_identified:
                     actual_identified_elses_vars += 1
 
-                # Then Vals
+                # Else Vals
                 vals_identified = True
                 identified_elses_vals += 1
                 for element in all_vals_desired:
                     if element not in all_vals_extracted:
                         vals_identified = False
+                        print('LOW ELSE')
+                        print('Desired: ', element)
+                        print('full desired: ', all_vals_desired)
+                        print('full extracted: ', all_vals_extracted)
+                        mistakes += 1
                 if vals_identified:
                     actual_identified_elses_vals += 1
 
-                # Then signs
+                # Else signs
                 signs_identified = True
                 identified_else_signs += 1
                 for element in all_signs_desired:
                     if element not in all_signs_extracted:
                         signs_identified = False
+                        mistakes += 1
                 if signs_identified:
                     actual_identified_else_signs += 1
+mistakes
 
 #################################################################################################
 # HIGH LEVEL RESULTS ############################################################################
@@ -1606,6 +1711,7 @@ print('cond_precision: ', cond_precision)
 print('cond_recall: ', cond_recall)
 
 cond_f_score = calculate_f_score(cond_precision, cond_recall)
+cond_f_score
 
 # Calculation of precision - cons --> actual_identified_consequences/identified_consequences
 # Calculation of recall - cons --> actual_identified_consequences/total_real_consequences
@@ -1615,6 +1721,7 @@ print('cons_precision: ', cons_precision)
 print('cons_recall: ', cons_recall)
 
 cons_f_score = calculate_f_score(cons_precision, cons_recall)
+cons_f_score
 
 #################################################################################################
 # LOW LEVEL RESULTS #############################################################################
@@ -1624,16 +1731,19 @@ if_var_precision, if_var_recall = get_precision_recall(actual_identified_ifs_var
 print('if_variables_precision: ', if_var_precision)
 print('if_variables_recall: ', if_var_recall)
 if_var_f_score = calculate_f_score(if_var_precision, if_var_recall)
+if_var_f_score
 
 if_val_precision, if_val_recall = get_precision_recall(actual_identified_ifs_vals, identified_ifs_vals, desired_total_ifs)
 print('if_values_precision: ', if_val_precision)
 print('if_values_recall: ', if_val_recall)
 if_val_f_score = calculate_f_score(if_val_precision, if_val_recall)
+if_val_f_score
 
 if_sign_precision, if_sign_recall = get_precision_recall(actual_identified_if_signs, identified_if_signs, desired_total_ifs)
 print('if_sign_precision: ', if_sign_precision)
 print('if_sign_recall: ', if_sign_recall)
 if_sign_f_score = calculate_f_score(if_sign_precision, if_sign_recall)
+if_sign_f_score
 
 if_f_score = (if_var_f_score + if_val_f_score + if_sign_f_score)/3
 
@@ -1642,16 +1752,19 @@ then_var_precision, then_var_recall = get_precision_recall(actual_identified_the
 print('then_variables_precision: ', then_var_precision)
 print('then_variables_recall: ', then_var_recall)
 then_var_f_score = calculate_f_score(then_var_precision, then_var_recall)
+then_var_f_score
 
 then_val_precision, then_val_recall = get_precision_recall(actual_identified_thens_vals, identified_thens_vals, desired_total_thens)
 print('then_values_precision: ', then_val_precision)
 print('then_values_recall: ', then_val_recall)
 then_val_f_score = calculate_f_score(then_val_precision, then_val_recall)
+then_val_f_score
 
 then_sign_precision, then_sign_recall = get_precision_recall(actual_identified_then_signs, identified_then_signs, desired_total_thens)
 print('then_sign_precision: ', then_sign_precision)
 print('then_sign_recall: ', then_sign_recall)
 then_sign_f_score = calculate_f_score(then_sign_precision, then_sign_recall)
+then_sign_f_score
 
 then_f_score = (then_var_f_score + then_val_f_score + then_sign_f_score)/3
 
@@ -1660,16 +1773,19 @@ else_var_precision, else_var_recall = get_precision_recall(actual_identified_els
 print('else_variables_precision: ', else_var_precision)
 print('else_variables_recall: ', else_var_recall)
 else_var_f_score = calculate_f_score(else_var_precision, else_var_recall)
+else_var_f_score
 
 else_val_precision, else_val_recall = get_precision_recall(actual_identified_elses_vals, identified_elses_vals, desired_total_elses)
 print('else_values_precision: ', else_val_precision)
 print('else_values_recall: ', else_val_recall)
 else_val_f_score = calculate_f_score(else_val_precision, else_val_recall)
+else_val_f_score
 
 else_sign_precision, else_sign_recall = get_precision_recall(actual_identified_else_signs, identified_else_signs, desired_total_elses)
 print('else_sign_precision: ', else_sign_precision)
 print('else_sign_recall: ', else_sign_recall)
 else_sign_f_score = calculate_f_score(else_sign_precision, else_sign_recall)
+else_sign_f_score
 
 else_f_score = (else_var_f_score + else_val_f_score + else_sign_f_score)/3
 
