@@ -1,7 +1,7 @@
 # --------------------------------------------------------------------------------------------------
 # %% import libraries ------------------------------------------------------------------------------
 import ast
-import neuralcoref
+#import neuralcoref
 import json
 import nltk
 from nltk.tree import *
@@ -22,7 +22,37 @@ from sklearn.pipeline import Pipeline
 # --------------------------------------------------------------------------------------------------
 # %% Special settings & miscellanneous -------------------------------------------------------------
 spacy.prefer_gpu()
+#nlp = stanfordnlp.Pipeline(processors='tokenize', lang='en')
 sp = spacy.load('en_core_web_sm')
+
+
+pos_dict = {
+# For NLTK pos tagger
+'CC': 'coordinating conjunction','CD': 'cardinal digit','DT': 'determiner',
+'EX': 'existential there (like: \"there is\" ... think of it like \"there exists\")',
+'FW': 'foreign word','IN':  'preposition/subordinating conjunction','JJ': 'adjective \'big\'',
+'JJR': 'adjective, comparative \'bigger\'','JJS': 'adjective, superlative \'biggest\'',
+'LS': 'list marker 1)','MD': 'modal could, will','NN': 'noun, singular \'desk\'',
+'NNS': 'noun plural \'desks\'','NNP': 'proper noun, singular \'Harrison\'',
+'NNPS': 'proper noun, plural \'Americans\'','PDT': 'predeterminer \'all the kids\'',
+'POS': 'possessive ending parent\'s','PRP': 'personal pronoun I, he, she',
+'PRP$': 'possessive pronoun my, his, hers','RB': 'adverb very, silently,',
+'RBR': 'adverb, comparative better','RBS': 'adverb, superlative best',
+'RP': 'particle give up','TO': 'to go \'to\' the store.','UH': 'interjection errrrrrrrm',
+'VB': 'verb, base form take','VBD': 'verb, past tense took',
+'VBG': 'verb, gerund/present participle taking','VBN': 'verb, past participle taken',
+'VBP': 'verb, sing. present, non-3d take','VBZ': 'verb, 3rd person sing. present takes',
+'WDT': 'wh-determiner which','WP': 'wh-pronoun who, what','WP$': 'possessive wh-pronoun whose',
+'WRB': 'wh-abverb where, when','QF' : 'quantifier, bahut, thoda, kam (Hindi)','VM' : 'main verb',
+'PSP' : 'postposition, common in indian langs','DEM' : 'demonstrative, common in indian langs',
+
+# For Spacy POS tagger
+'PROPN': 'propper noun, like "apple"','ADP':'conjunction, subordinating or preposition','VERB': 'VERB', 'VBG':'VERB', 'NOUN': 'noun, names of people, places, things, feelings...', '$': 'Symbol', 'NUM':'number', 'SYM': 'Symbol', 'PRON': 'Pronoun, like I, she, you, him ...', 'PUNCT': 'Punctuation', 'X':'email', 'ADJ':'affix','CCONJ':'conjunction, coordinating', 'DET': 'determiner', 'ADJ':'adjective', 'PRON':'pronoun, personal','ADV': 'Adverb', 'PART':'possessive ending', 'AUX':'"be", "do", "have"'
+}
+
+dep_dict = {
+'ROOT':'root', 'root': 'root', 'dep': 'dependent', 'aux': 'auxiliary', 'aux:pass': 'passive auxiliary', 'cop': 'copula', 'arg': 'argument', 'agent': 'agent', 'comp': 'complement', 'acomp': 'adjectival complement', 'ccomp': 'clausal complement with internal subject', 'xcomp': 'clausal complement with external subject', 'obj': 'object', 'dobj': 'direct object', 'iobj': 'indirect object', 'pobj': 'object of preposition', 'subj': 'subject', 'nsubj': 'nominal subject', 'nsubj:pass': 'passive nominal subject', 'csubj': 'clausal subject', 'csubj:pass': 'passive clausal subject', 'cc': 'coordination', 'conj': 'conjunct', 'expl': 'expletive (expletive \“there\”)', 'mod': 'modifier', 'amod': 'adjectival modifier', 'appos': 'appositional modifier', 'advcl': 'adverbial clause modifier', 'det': 'determiner', 'predet': 'predeterminer', 'preconj': 'preconjunct', 'vmod': 'reduced, non-finite verbal modifier', 'mwe': 'multi-word expression modifier', 'mark': 'marker (word introducing an advcl or ccomp', 'advmod': 'adverbial modifier', 'neg': 'negation modifier', 'rcmod': 'relative clause modifier', 'quantmod': 'quantifier modifier', 'nn': 'noun compound modifier', 'npadvmod': 'noun phrase adverbial modifier', 'tmod': 'temporal modifier', 'num': 'numeric modifier', 'number': 'element of compound number', 'prep': 'prepositional modifier', 'poss': 'possession modifier', 'possessive': 'possessive modifier(s)', 'prt': 'phrasal verb particle', 'parataxis': 'parataxis', 'goeswith': 'goes with', 'punct': 'punctuation', 'ref': 'referent', 'sdep': 'semantic dependent', 'xsubj': 'controlling subject', 'compound': 'compound pair', 'nmod': 'nominal modifier', 'obl': 'oblique nominal', 'case': 'case marking', 'nmod': 'nominal modifier', 'nummod': 'nominal modifier'
+}
 
 # --------------------------------------------------------------------------------------------------
 # %% Functions -------------------------------------------------------------------------------------
@@ -401,6 +431,8 @@ def remove_puncts_v2(doc_list):
 
 def flatten(nested_list):
     flat_list = []
+    if type(nested_list) != list:
+        return nested_list
     for sublist in nested_list:
         if type(sublist) == list:
             for item in sublist:
@@ -412,12 +444,10 @@ def flatten(nested_list):
             return flatten(flat_list)
     return flat_list
 
+
+#####################################################################################
+#####################################################################################
 # %% HIGH LEVEL
-#  ██████  ██████  ███    ██ ██████  ██ ████████ ██  ██████  ███    ██
-# ██      ██    ██ ████   ██ ██   ██ ██    ██    ██ ██    ██ ████   ██
-# ██      ██    ██ ██ ██  ██ ██   ██ ██    ██    ██ ██    ██ ██ ██  ██
-# ██      ██    ██ ██  ██ ██ ██   ██ ██    ██    ██ ██    ██ ██  ██ ██
-#  ██████  ██████  ██   ████ ██████  ██    ██    ██  ██████  ██   ████
 
 # ███████ ██   ██ ████████ ██████   █████   ██████ ████████  ██████  ██████  ███████
 # ██       ██ ██     ██    ██   ██ ██   ██ ██         ██    ██    ██ ██   ██ ██
@@ -430,6 +460,8 @@ def flatten(nested_list):
 # ███████ ██ ██   ███ ███████     ██      █████   ██    ██ █████   ██
 # ██   ██ ██ ██    ██ ██   ██     ██      ██       ██  ██  ██      ██
 # ██   ██ ██  ██████  ██   ██     ███████ ███████   ████   ███████ ███████
+#####################################################################################
+#####################################################################################
 
 def implied_condition_consequence_extractor(doc):
     """
@@ -460,19 +492,49 @@ def implied_condition_consequence_extractor(doc):
 
 
 def condition_consequence_extractor_v3(doc):
+    try:
+        if condition_identifier(doc):
+            possible_conditions, possible_ors = get_possible_conditions(doc)
+            condition_part, split_key = get_condition_v3(possible_conditions)
+            consequence_part = get_consequence_v3(doc, split_key)
+            # Perform cleaning on output:
+            output = {'condition': remove_duplicate_chunks(condition_part), 'consequence': remove_duplicate_chunks(consequence_part)}
+            disctinct_sentences = get_distinct_sentences(condition_part, consequence_part)
+            output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
+
+            return output
+        else:
+            return 'No conditional statement in sentence'
+    except:
+        return 'No conditional statements could be extracted in spite of a condition being present.'
+
+
+def condition_consequence_extractor_v4(doc):
     if condition_identifier(doc):
+        doc_dep_tags = [word.dep_ for word in doc]
         possible_conditions, possible_ors = get_possible_conditions(doc)
-        condition_part, split_key = get_condition_v3(possible_conditions)
-        consequence_part = get_consequence_v3(doc, split_key)
+        # If the root indicates the consequence
+        if not dict_empty(possible_conditions) and 'relcl' not in doc_dep_tags:
+            condition_part, split_keys = get_condition_v4(doc, possible_conditions, possible_ors)
+            #consequence_part = get_root_subtree_without_tagx(doc, split_keys)
+            consequence_part = get_other_part(doc, condition_part)
+        elif 'relcl' in doc_dep_tags:
+            # If root indicates the condition
+            consequence_part = get_biggest_subtree(doc, 'relcl')
+            condition_part = get_other_part(doc, consequence_part)
+        else:
+            return 'No conditional statements could be extracted in spite of a condition being present.'
+        ############################################################################################
+        # Probably not needed anymore
         # Perform cleaning on output:
         output = {'condition': remove_duplicate_chunks(condition_part), 'consequence': remove_duplicate_chunks(consequence_part)}
-        disctinct_sentences = get_distinct_sentences(condition_part, consequence_part)
-        output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
+        disctinct_sentences = get_distinct_sentences_v2(output['condition'], output['consequence'])
+        output = {'condition': remove_link_words(disctinct_sentences[0]), 'consequence': remove_link_words(disctinct_sentences[1])}
 
         return output
     else:
         return 'No conditional statement in sentence'
-
+        #return implied_condition_consequence_extractor(doc)
 
 def get_other_part(doc, first_part):
     doc_idx = [word.idx for word in doc]
@@ -484,31 +546,27 @@ def get_other_part(doc, first_part):
     return output
 
 
-def condition_consequence_extractor_v4(doc):
-    if condition_identifier(doc):
-        doc_dep_tags = [word.dep_ for word in doc]
-        possible_conditions, possible_ors = get_possible_conditions(doc)
-        # If the root indicates the consequence
-        if not dict_empty(possible_conditions) and 'relcl' not in doc_dep_tags:
-            condition_part, split_keys = get_condition_v4(doc, possible_conditions, possible_ors)
-            consequence_part = get_root_subtree_without_tagx(doc, split_keys)
-        elif 'relcl' in doc_dep_tags:
-            # If root indicates the condition
-            consequence_part = get_biggest_subtree(doc, 'relcl')
-            condition_part = get_other_part(doc, consequence_part)
-        else:
-            return 'No conditional statements could be extracted in spite of a condition being present.'
-        ############################################################################################
-        # Probably not needed anymore
-        # Perform cleaning on output:
-        output = {'condition': remove_duplicate_chunks(condition_part), 'consequence': remove_duplicate_chunks(consequence_part)}
-        disctinct_sentences = get_distinct_sentences_v2(condition_part, consequence_part)
-        output = {'condition': disctinct_sentences[0], 'consequence': disctinct_sentences[1]}
-
-        return output
-    else:
-        return 'No conditional statement in sentence'
-        #return implied_condition_consequence_extractor(doc)
+def extract_correct_advcl_part(doc):
+    temp_list_output = []
+    for word in doc:
+        if word.dep_ in ['advcl']:
+            temp_list = []
+            before = []
+            after = []
+            for w in [child for child in word.children]:
+                if w.dep_ != 'advcl':
+                    if w.idx < word.idx:
+                        # Append everything before root
+                        [before.append(wi) for wi in w.subtree]
+                    else:
+                        # Append everything after root
+                        [after.append(wi) for wi in w.subtree]
+            temp_list.append([w for w in before])
+            temp_list.append(word)
+            temp_list.append([w for w in after])
+            if condition_identifier(make_string(flatten(temp_list))):
+                temp_list_output.append(flatten(temp_list))
+    return temp_list_output
 
 
 def get_condition_v3(possible_conditions):
@@ -533,8 +591,10 @@ def get_condition_v4(doc, possible_conditions, possible_ors):
     # However, if the advcl key is not empty, take advcl as key
     if 'advcl' in keys:
         key = 'advcl'
-    elif 'prep' in keys:
-        key = 'prep'
+    #elif 'prep' in keys:
+        #key = 'prep'
+        if len(possible_conditions[key]) > 1:
+            possible_conditions[key] = extract_correct_advcl_part(doc)
 
     possible_conditions_idx = [word.idx for word in possible_conditions[key][0]]
     condition = flatten(possible_conditions[key])
@@ -753,13 +813,9 @@ def else_identifier(sentence):
                 if wordphrase in sentence.lower():
                     return True, wordphrase
     return False, None
-
+#####################################################################################
+#####################################################################################
 # %% Low level
-#  ██████  ██████  ███    ██ ██████  ██ ████████ ██  ██████  ███    ██
-# ██      ██    ██ ████   ██ ██   ██ ██    ██    ██ ██    ██ ████   ██
-# ██      ██    ██ ██ ██  ██ ██   ██ ██    ██    ██ ██    ██ ██ ██  ██
-# ██      ██    ██ ██  ██ ██ ██   ██ ██    ██    ██ ██    ██ ██  ██ ██
-#  ██████  ██████  ██   ████ ██████  ██    ██    ██  ██████  ██   ████
 
 # ███████ ██   ██ ████████ ██████   █████   ██████ ████████  ██████  ██████
 # ██       ██ ██     ██    ██   ██ ██   ██ ██         ██    ██    ██ ██   ██
@@ -772,13 +828,15 @@ def else_identifier(sentence):
 # ██      ██    ██ ██  █  ██     ██      █████   ██    ██ █████   ██
 # ██      ██    ██ ██ ███ ██     ██      ██       ██  ██  ██      ██
 # ███████  ██████   ███ ███      ███████ ███████   ████   ███████ ███████
+#####################################################################################
+#####################################################################################
 
 def valid_phrase(distinct_conj):
     pos_tags = [el.pos_ for el in distinct_conj]
     dep_tags = [el.dep_ for el in distinct_conj]
     if ('NOUN' in pos_tags and 'VERB' in pos_tags) or ('AUX' in pos_tags and 'NOUN' in pos_tags) or ('NUM' in pos_tags and 'VERB' in pos_tags) or ('NUM' in pos_tags and 'AUX' in pos_tags):
         return True
-    elif 'nsubj' in dep_tags or 'nsubjpass' in dep_tags:
+    elif ('nsubj' in dep_tags or 'nsubjpass' in dep_tags) or ('quantmod' in dep_tags and 'NOUN' in dep_tags):
         return True
     return False
 
@@ -791,6 +849,7 @@ def split_in_conjs(doc):
     doc_pos_tags = [w.pos_ for w in doc]
     token_list = [w for w in doc]
     output_parts = []
+    conj_words = [w for w in doc if w.pos_ == 'CCONJ']
     # -- If there is no conjunction tag, return the original doc
     if 'conj' not in doc_dep_tags:
         return [doc], binder
@@ -798,7 +857,6 @@ def split_in_conjs(doc):
         # Split in possible conjunctions
         while 'conj' in doc_dep_tags:
             conj = get_biggest_subtree(doc, 'conj')
-
             distinct_conj = make_string(conj)
             last_conj_valid = True
             # Check whether the extracted conj is actually valid new phrase
@@ -809,7 +867,8 @@ def split_in_conjs(doc):
             else:
                 last_conj_valid = False
                 # Append the sentence until that chunk to the output and get the difference of that one with the original
-                first_part = doc[:token_list.index(conj[-1])+1]
+                #first_part = doc[:token_list.index(conj[-1])+1]
+                first_part = doc[:token_list.index(conj_words[-1])+1]
                 conj = remove_puncts_v2(get_other_part(doc, first_part))
                 first_part = make_string([w for w in first_part])
                 output_parts.append(first_part)
@@ -820,6 +879,7 @@ def split_in_conjs(doc):
             doc = distinct_conj
             token_list = [w for w in doc]
             doc_dep_tags = [w.dep_ for w in distinct_conj]
+            last_conj_valid = True
         if conj == [] and len(output_parts) == 1:
             return [output_parts], None
         else:
@@ -838,7 +898,7 @@ def split_in_conjs(doc):
 
 
 def remove_link_words(doc):
-    link_words = ['furthermore', 'additionaly', 'besides', 'moreover', 'firstly', 'secondly', 'thirdly', 'fourthly', 'fifthly', 'sixthly', 'further', 'as well as', 'not to mention', 'on the other hand', 'at last']
+    link_words = ['furthermore', 'additionaly', 'besides', 'moreover', 'firstly', 'secondly', 'thirdly', 'fourthly', 'fifthly', 'sixthly', 'further', 'as well as', 'not to mention', 'on the other hand', 'at last', 'finally']
     link_phrases = []
     list_words = [w for w in doc]
     string_words = ' '.join([w.text for w in doc]).lower()
@@ -856,7 +916,9 @@ def get_full_dmn_rule(doc):
     rule = {'if':[], 'then':[], 'else':[]}
     else_part = []
     #  Step 1: get the cond, cons and else parts
-    cond_cons = condition_consequence_extractor_v4(doc)
+    cond_cons = condition_consequence_extractor_v3(doc)
+    if cond_cons == 'No conditional statement in sentence':
+        return get_lower_level_rule_v2(doc)
     cond, cons = sp(remove_conditional_words(make_string(cond_cons['condition']))), sp(remove_consequence_words(make_string(cond_cons['consequence'])))
     cond, cons = remove_link_words(cond), remove_link_words(cons)
     else_in_cons, else_syn = else_identifier(str(cons))
@@ -879,13 +941,13 @@ def get_full_dmn_rule(doc):
     # Step 3: Extract and append the rule notations to the appropriate key in dict
     # -- 3.a ifs
     for c in conds:
-        rule['if'].append(get_lower_level_rule(c))
+        rule['if'].append(get_lower_level_rule_v2(c))
     # -- 3.b thens
     for c in conss:
-        rule['then'].append(get_lower_level_rule(c))
+        rule['then'].append(get_lower_level_rule_v2(c))
     # -- 3.c elses
     for c in elses:
-        rule['else'].append(get_lower_level_rule(c))
+        rule['else'].append(get_lower_level_rule_v2(c))
     return rule
 
 
@@ -917,105 +979,13 @@ def get_lower_level_rule(doc):
         return doc
 
 
-def get_dmn_rule_num(doc):
-    doc_idx = [w.idx for w in doc]
-    possible_vars = []
-    possible_vals = []
-    possible_verbs = []
-    rule_sign = get_rule_sign(doc)
-    root_word = get_root(doc)
-    doc_dep_tags = [w.dep_ for w in doc]
-    # Parse over the sentence and append every word to the right list
-    if rule_sign == '[X, Y]':
-        # To correctly assign between values
-        for word in doc:
-            if word.pos_ == 'NUM':
-                possible_vals.append(word)
-            elif word.pos_ in ['NOUN', 'ADJ']:
-                possible_vars.append(word)
-
-    elif root_word.pos_ == 'NOUN':
-        possible_vars.append(root_word)
-        for w in doc:
-            if w.dep_ in ['attr', 'pobj', 'acomp', 'dobj', 'nsubj']:
-                    possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN']])
-    elif 'dobj' not in doc_dep_tags and 'pobj' not in doc_dep_tags and 'attr' not in doc_dep_tags:
-        for w in doc:
-            if w.dep_ == 'nsubj' or w.dep_ == 'nsubjpass':
-                possible_vals.append([wi for wi in w.subtree])
-    else:
-        for w in doc:
-            if w.pos_ in ['VERB', 'AUX']:
-                possible_verbs.append({'word': w, 'lemma': sp(w.lemma_), 'id': w.idx, 'index': doc_idx.index(w.idx)})
-                if sp(w.lemma_)[0].pos_ == 'NOUN':
-                    possible_vars.append([sp(w.lemma_)])
-            # Append possible vars
-            elif w.dep_ in ['nsubj', 'nsubjpass']:
-                possible_vars.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'PRON']])
-            # Append possible vals
-            elif w.dep_ in ['attr', 'pobj', 'acomp', 'dobj']:
-                possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'NUM', 'PROPN']])
-    #flatten all intermediate outputs before cleaning them
-    possible_vars = flatten(possible_vars)
-    possible_vals = flatten(possible_vals)
-    if possible_vals == []:
-        possible_vars.append([possible_verbs_i['lemma'] for possible_verbs_i in possible_verbs])
-        possible_vals = get_true_or_false(doc)
-        possible_vars = flatten(possible_vars)[-1]
-    elif len(possible_vals) > 1:
-        possible_vals = remove_duplicate_chunks(possible_vals)
-    possible_vars = flatten(possible_vars)
-
-    return possible_vars, rule_sign, possible_vals
-
-
-def get_dmn_rule_nom(doc):
-    #get_dep_parse(doc)
-    doc_idx = [w.idx for w in doc]
-    possible_vars = []
-    possible_vals = []
-    possible_verbs = []
-    rule_sign = get_rule_sign(doc)
-    root_word = get_root(doc)
-    doc_dep_tags = [w.dep_ for w in doc]
-    # If there's only one element in the doc, then it's probably the value itself
-    if 'nsubj' not in doc_dep_tags and 'nsubjpass' not in doc_dep_tags:
-        possible_vals.append([w for w in doc if w.pos_ in ['NOUN', 'ADJ', 'NUM']])
-        return possible_vars, rule_sign, possible_vals
-
-    # Parse over the sentence and append every word to the right list
-    for w in doc:
-        if w.pos_ in ['VERB', 'AUX']:
-            possible_verbs.append({'word': w, 'lemma': sp(w.lemma_), 'id': w.idx, 'index': doc_idx.index(w.idx)})
-            if sp(w.lemma_)[0].pos_ == 'NOUN':
-                possible_vars.append([sp(w.lemma_)])
-        # Append possible vars
-        if w.dep_ in ['nsubj', 'nsubjpass']:
-            possible_vars.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'PRON', 'PROPN', 'VERB']])
-        # Append possible vals
-        if w.dep_ in ['attr', 'pobj', 'acomp', 'dobj']:
-            possible_vals.append([subw for subw in w.subtree if subw.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN']])
-    #flatten all intermediate outputs before cleaning them
-    possible_vars = flatten(possible_vars)
-    possible_vals = flatten(possible_vals)
-    if possible_vals == []:
-        if possible_vars == []:
-            possible_vars.append([possible_verbs_i['lemma'] for possible_verbs_i in possible_verbs])
-        possible_vals = get_true_or_false(doc)
-    elif len(possible_vals) > 1:
-        possible_vals = remove_duplicate_chunks(possible_vals)
-    possible_vars = flatten(possible_vars)
-
-    return possible_vars, rule_sign, possible_vals
-
-
 def get_true_or_false(doc):
     for w in doc:
         if w.dep_ == 'neg':
-            return False
+            return 'False'
         elif 'no' in [w.text.lower() for w in doc]:
-            return False
-    return True
+            return 'False'
+    return 'True'
 
 
 def clean_vals(possible_vals):
@@ -1032,12 +1002,14 @@ def clean_vals(possible_vals):
 
 def get_rule_sign(doc):
     doc_text = ' '.join([w.lemma_ for w in doc]).lower()
-    less_than_syns = ['less than', 'few than', "do n't exceed ", "do 'nt surmount ", "don't pass ", 'young than']
+    less_than_syns = ['less than', 'few than', "do n't exceed ", "do 'nt surmount ", "don't pass ", 'young than', 'low than']
     less_equal_syns = ['less than or equal', 'less than or equal']
-    greater_than_syns = ['great than', 'more than', 'exceed ', 'surmount ', ' pass ', 'be above', 'old than']
+    greater_than_syns = ['great than', 'more than', 'exceed ', 'surmount ', ' pass ', 'be above', 'old than', 'long than']
     great_equal_syns = ['great than or equal', 'more than or equal']
-    if 'between ' in doc_text or 'within ' in doc_text or 'interval ' in doc_text:
-        return '[X, Y]'
+    if ('between ' in doc_text or 'be within ' in doc_text or 'in ' in doc_text):
+        return 'in'
+    if 'neg' in [w.dep_ for w in doc]:
+        return '!='
     for great_equal in great_equal_syns:
         if great_equal in doc_text:
             return '>='
@@ -1097,3 +1069,49 @@ def remove_conditional_words(doc):
                         output = doc_string[:doc_string.lower().find(wordphrase)] + doc_string[doc_string.lower().find(wordphrase) + len(wordphrase):]
                         return output.strip()
         return doc.text
+
+
+def get_lower_level_rule_v2(doc):
+    if doc == []:
+        return []
+    rule_sign = get_rule_sign(doc)
+    vars = []
+    vals = []
+    if rule_sign == 'in':
+        for word in doc:
+            if word.pos_ in ['NUM']:
+                vals.append(word)
+            elif word.pos_ in ['NOUN', 'ADJ']:
+                vars.append(word)
+    else:
+        for word in doc:
+            if word.dep_ in ['nsubjpass','nsubj']:
+                vars.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ', 'PROPN']])
+            elif word.dep_ in ['dobj', 'pobj', 'attr', 'acomp']:
+                vals.append([w for w in word.subtree if w.pos_ in ['NOUN', 'ADJ', 'NUM', 'PROPN', 'VERB']])
+            # For action sentences
+            elif word.dep_ in ['xcomp']:
+                vars.append([w for w in word.subtree if w.pos_ in ['VERB']])
+    if get_root(doc).pos_ == 'NOUN':
+        vals.append(get_root(doc))
+    vars = flatten(vars)
+    vals = flatten(vals)
+    if 'NUM' in [w.pos_ for w in doc] and 'NUM' not in [w.pos_ for w in vars] and 'NUM' not in [w.pos_ for w in vals]:
+        for w in doc:
+            if w.pos_ in ['NUM']:
+                vars.append(w)
+    if vars == [] and vals == []:
+        vars = [w for w in doc if w.pos_ in ['ADJ', 'NOUN', 'NUM']]
+
+    if sp(get_root(doc).lemma_)[0].pos_ == 'NOUN' and (vals == [] or vars == []):
+        vars.append(get_root(doc))
+    if 'NUM' in [el.pos_ for el in flatten(vars)] and flatten(vals) != []:
+        vars, vals = vals, vars
+    if flatten(vals) == []:
+        rule_sign = '='
+        vals = get_true_or_false(doc)
+    elif flatten(vars) == []:
+        rule_sign = '='
+        vars = vals
+        vals = get_true_or_false(doc)
+    return vars, rule_sign, vals

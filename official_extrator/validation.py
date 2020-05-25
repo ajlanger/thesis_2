@@ -1,12 +1,11 @@
 # %% Import libraries
-
-import condition_consequence_extractor
+from decision_logic_extractor import *
 
 # --------------------------------------------------------------------------------------------------
 # Ex 1: If A then ACTION --> So only one object, one condition for object and one action
 doc = sp("A boat needs to be checked if it hasn't an age of 20 years.")
-condition_consequence_extractor.get_full_dmn_rule(doc)
-
+condition_consequence_extractor_v3(doc)
+get_full_dmn_rule(doc)
 # --------------------------------------------------------------------------------------------------
 # Ex 2: If A and B then ACTION / If A or B then ACTION (SAME DEPENDENCY STRUCTURE FOR AND AND OR)
 

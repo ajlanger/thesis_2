@@ -64,8 +64,6 @@ dep_dict = {
 #      ██ ██    ██ ██      ██      ██    ██ ██   ██    ██
 # ███████  ██████  ██      ██       ██████  ██   ██    ██
 
-
-
 # ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████
 # ██      ██    ██ ████   ██ ██         ██    ██ ██    ██ ████   ██ ██
 # █████   ██    ██ ██ ██  ██ ██         ██    ██ ██    ██ ██ ██  ██ ███████
@@ -1248,19 +1246,9 @@ temp_list = get_texts('textual_data/raw_data.txt')
 # Remove unnecesarry characters
 
 only_sentences = get_only_sentences(temp_list)
-# --------------------------------------------------------------------------------------------------
-# %% Split into single sentences -------------------------------------------------------------------
-# ....... with spaCy
-
-if_vars = []
-if_vals_1 = []
-if_vals_2 = []
-then_vars = []
-then_vals = []
 sentences_spacy = get_spacy_lib(only_sentences)
-sp("If the amount is between 20 and 30 units, give a discount.")
-sentences_spacy['Dataset_2']
-# A discount of 4% and otherwise 9% is given when the order exceeds 10 units.
+
+
 for sentence in sentences_spacy['Dataset_2']:
     print('######################################################')
     #print('')
@@ -1276,38 +1264,21 @@ for sentence in sentences_spacy['Dataset_2']:
         #print(cond_cons)
         cond = sp(remove_conditional_words(make_string(cond_cons['condition'])))
         cons = sp(remove_consequence_words(make_string(cond_cons['consequence'])))
-        print('--cond--')
-        print(cond)
-        print('--cons--')
-        print(cons)
-        print('')
+        #print('--cond--')
+        #print(cond)
+        #print('--cons--')
+        #print(cons)
+        #print('')
         print('LOW LEVEL')
         dictiona = get_full_dmn_rule(sentence)
-        #print(dictiona)
-        if_vals_1.append((dictiona['if'][0][1], dictiona['if'][0][2]))
-        if_vals_2.append((dictiona['if'][1][1], dictiona['if'][1][2]))
-        if_vars.append(dictiona['if'][0][0])
-        if_vars.append(dictiona['if'][1][0])
-        for then_part in dictiona['then']:
-            then_vars.append(then_part[0])
-            then_vals.append((then_part[1], then_part[2]))
         print('IF: ', dictiona['if'])
         print('THEN: ', dictiona['then'])
         print('ELSE: ', dictiona['else'])
-
         # print(dictiona['binder_if'], dictiona['binder_then'], dictiona['binder_else'])
     else:
-        print(get_lower_level_rule_v2(sentence))
-        #print(cond_cons)
+        print(cond_cons)
         #print(get_lower_level_rule(sentence))
         print('')
-
-# Make pandas DataFrame
-columns = [str(make_string(if_vars[0])), str(make_string(if_vars[1])), str(make_string(then_vars[0]))]
-
-pd_dict = {columns[0]: if_vals_1, columns[1]: if_vals_2, columns[2]: then_vals}
-
-pd.DataFrame(pd_dict)
 
 """
 Customers with a premium card should always be admitted to the lounge.
@@ -1359,9 +1330,6 @@ test_data['low_else'] = desired_else_rules
 desired_total_ifs = count_rules(desired_if_rules)
 desired_total_thens = count_rules(desired_then_rules)
 desired_total_elses = count_rules(desired_else_rules)
-desired_total_ifs
-desired_total_thens
-desired_total_elses
 # Actual identified
 actual_identified_conditions = 0
 actual_identified_consequences = 0
