@@ -20,7 +20,34 @@ Dataset_6
 If the order is above 5 units and the day is Tuesday, then a discount of 5% is given. A discount of 10% is given whenever the order exceeds 10 units and the customer number begins with 5. When the financial situation is good and the loan is less than 1000 euro, the applicant risk rating is low. The risk rating is medium if the financial situation is moderate and the loan exceeds 1100 euro. The service request is a product change if the score is 10 and the amount of hours needed is 9. In case that the score is 5 and the estimated work time is less than 5 hours, the service request is a bug.
 
 Dataset_7
-If the order is above 5 units, the customer number starts with 0 and the day is Tuesday, then a discount of 5% is given. A discount of 10% is given whenever the order exceeds 10 units, it is weekend and the customer number begins with 5. When the financial situation is good, the customer has an income and the loan is less than 1000 euro, the applicant risk rating is low. The risk rating is medium if the financial situation is moderate, the customer has a business and the loan exceeds 1100 euro. The service request is a product change if the score is 10, the technical analysis was easy and the amount of hours needed is 9. In case that the score is 5, the technical analysis was difficult and the estimated work time is less tan 5 hours, then the service request is a bug.
+If the order is above 5 units, the customer number starts with 0 and the day is Tuesday, then a discount of 5% is given. A discount of 10% is given whenever the order exceeds 10 units, it is weekend and the customer number begins with 5. When the financial situation is good, the customer has an income and the loan is less than 1000 euro, the applicant risk rating is low. The risk rating is medium if the financial situation is moderate, the customer has a business and the loan exceeds 1100 euro. The service request is a product change if the score is 10, the technical analysis was easy and the amount of hours needed is 9. In case that the score is 5, the technical analysis was difficult and the estimated work time is less than 5 hours, then the service request is a bug.
 
 Dataset_8
 If the order is above 5 units, the discount is 5%, otherwise the discount is 2%. A discount of 4% and otherwise 9% is given when the order exceeds 10 units. When the financial situation is good, the applicant risk rating is low, else it is high. If the financial situation is moderate, the risk level is medium and otherwise low. If the score is 10, the service request is a product change, otherwise it is a bug. In case that the score is 5, then the service request is a bug, otherwise it is a product change.
+
+Dataset_9
+Customers with a premium card should always be admitted to the lounge.
+However, when the customer is a monthly subscriber, then he should receive a bottle of champagne.
+When the order exceeds 200 units and the customer is a business, a discount of 10% applies.
+A discount of 8% applies if the customer is a private entity.
+When the uranium is low, add more energy.
+If the car is not repairable, charge 10€ extra.
+Send two mails to the customer if he has pays for a premium service.
+In case that the stock runs out, replenish it on a monthly base.
+The inventory should be counted every two days.
+The inventory should be counted every three days whenever it's a holiday.
+If it's weekend, count the inventory.
+Give an extra discount if the customer has a membership card.
+A promotion should be given every day of the week.
+The customer should be greeted with a cup of coffee.
+In case of bad weather, do not sell any icecream.
+If the weather is sunny, sell icecream, else sell waffles.
+If the computer has an anti-virus, remove it, otherwise install a new anti-virus.
+In case of a robery, send police troops, otherwise send the police corps.
+A computer should be repaired for free if the customer has a special status, else charge 10€.
+If the student has bad marks and is suspended, remove the student from the database.
+If the person is between 10 and 20 years old, he is permitted to the park, otherwise not.
+The customer should be between 20 and 30 years old.
+If the amount is between 20 and 30 units, give a discount.
+The discount is 30% if the customer is 10 years old.
+The discount is always 3%.
