@@ -534,7 +534,7 @@ def condition_consequence_extractor_v4(doc):
         return output
     else:
         return 'No conditional statement in sentence'
-        #return implied_condition_consequence_extractor(doc)
+
 
 def get_other_part(doc, first_part):
     doc_idx = [word.idx for word in doc]
@@ -1114,4 +1114,25 @@ def get_lower_level_rule_v2(doc):
         rule_sign = '='
         vars = vals
         vals = get_true_or_false(doc)
+    if vars != []:
+        if 'spacy' in str(type(vars[0])):
+            vars = remove_duplicate_chunks(vars)
+            vars = order(vars)
+    if vals != []:
+        if 'spacy' in str(type(vals[0])):
+            vals = remove_duplicate_chunks(vals)
+            vals = order(vals)
     return vars, rule_sign, vals
+
+
+def order(doclist):
+    output = []
+    doclist_idx = [w.idx for w in doclist]
+    doclist_idx.sort()
+    doclist_idx.append('STOP')
+    while doclist_idx != ['STOP']:
+        for w in doclist:
+            if w.idx == doclist_idx[0]:
+                output.append(w)
+        doclist_idx = doclist_idx[1:]
+    return output

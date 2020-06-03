@@ -3,9 +3,9 @@ from decision_logic_extractor import *
 
 # --------------------------------------------------------------------------------------------------
 # Ex 1: If A then ACTION --> So only one object, one condition for object and one action
-doc = sp("A boat needs to be checked if it hasn't an age of 20 years.")
-condition_consequence_extractor_v3(doc)
-get_full_dmn_rule(doc)
+doc = sp("Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny.")
+condition_consequence_extractor_v4(doc)
+get_dep_parse(doc)
 # --------------------------------------------------------------------------------------------------
 # Ex 2: If A and B then ACTION / If A or B then ACTION (SAME DEPENDENCY STRUCTURE FOR AND AND OR)
 
@@ -22,9 +22,14 @@ doc = sp("In case that a person is between 19 and 21 years old and was not invol
 ###################################################################################################
 
 # All key elements in place, now last representation of the rules
-doc = sp("If the service request is a product change and the customer is in , the customer is charged 50 euro.")
+doc1 = sp("If the customer stays for 2 days rent is 100 euro .")
+doc2 = sp("If the customer stays for 2 days, rent is 100 euro .")
 
+condition_consequence_extractor_v3(doc1)
+condition_consequence_extractor_v3(doc2)
 
+get_dep_parse(doc1)
+get_dep_parse(doc2)
 
 ###################################################################################################
 ###################################################################################################
@@ -146,7 +151,7 @@ validation = ["If the mouse is red then it should be washed.", "Whenever the day
 # # Data processing part
 # %% Extract all data from the text data and make list ---------------------------------------------
 #filename = 'C:/Users/Arnaud/Google Drive/Master of AI/3. Thesis/thesis_2/raw_data.txt'
-temp_list = get_texts('textual_data/raw_data.txt')
+temp_list = get_texts('../textual_data/raw_data.txt')
 
 # %% Make data dict --------------------------------------------------------------------------------
 # Remove unnecesarry characters
@@ -156,29 +161,30 @@ only_sentences = get_only_sentences(temp_list)
 # %% Split into single sentences -------------------------------------------------------------------
 # ....... with spaCy
 
+test_data = pd.read_csv(r"../textual_data/test_data_csv_v2.csv", sep=';')
 sentences_spacy = get_spacy_lib(only_sentences)
 
 # A discount of 4% and otherwise 9% is given when the order exceeds 10 units.
-for sentence in sentences_spacy['Dataset_8']:
+for sentence in sentences_spacy['Dataset_7']:
     print('######################################################')
-    #print('')
     print('----- NEXT SENTENCE -----')
-    #print('')
     print(sentence)
     if 'doc' not in str(type(sentence)).lower():
         sentence = sp(str(sentence))
-    cond_cons = condition_consequence_extractor_v4(sentence)
+    #print(get_pos_tags_spacy(sentence))
+
+    cond_cons = condition_consequence_extractor_v3(sentence)
 
     if cond_cons != 'No conditional statement in sentence' and cond_cons != 'No conditional statements could be extracted in spite of a condition being present.':
-        #print('HIGH LEVEL')
+        print('HIGH LEVEL')
         #print(cond_cons)
         cond = sp(remove_conditional_words(make_string(cond_cons['condition'])))
         cons = sp(remove_consequence_words(make_string(cond_cons['consequence'])))
-        #print('--cond--')
-        #print(cond)
-        #print('--cons--')
-        #print(cons)
-        #print('')
+        print('--cond--')
+        print(cond)
+        print('--cons--')
+        print(cons)
+        print('')
         print('LOW LEVEL')
         dictiona = get_full_dmn_rule(sentence)
         print('IF: ', dictiona['if'])
@@ -189,3 +195,7 @@ for sentence in sentences_spacy['Dataset_8']:
         print(cond_cons)
         #print(get_lower_level_rule(sentence))
         print('')
+
+doc = sp("If the loan lies in between 3000 and 6000 euros and the customer is a company, then an interest rate of 0.05% applies.")
+condition_consequence_extractor_v3(doc)
+get_dep_parse(doc)

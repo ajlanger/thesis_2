@@ -1,5 +1,5 @@
 # First import the decision logic extractor
-from decision_logic_extractor import *
+from official_extractor.decision_logic_extractor import *
 # ---- Step 1: Make a spacy document of the sentence
 doc = sp("If the day is rainy, sell waffles.")
 
