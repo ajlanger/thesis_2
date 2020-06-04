@@ -16,10 +16,10 @@ then_vals = []
 for sentence in sentences_spacy['Dataset_2']:
     if 'doc' not in str(type(sentence)).lower():
         sentence = sp(str(sentence))
-    cond_cons = condition_consequence_extractor_v4(sentence)
+    cond_cons = condition_consequence_extractor(sentence)
 
     if cond_cons != 'No conditional statement in sentence' and cond_cons != 'No conditional statements could be extracted in spite of a condition being present.':
-        dictiona = get_full_dmn_rule(sentence)
+        dictiona = get_rule_components(sentence)
         if_vals_1.append((dictiona['if'][0][1], dictiona['if'][0][2]))
         if_vals_2.append((dictiona['if'][1][1], dictiona['if'][1][2]))
         if_vars.append(dictiona['if'][0][0])

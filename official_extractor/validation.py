@@ -1,11 +1,13 @@
 # %% Import libraries
-from decision_logic_extractor import *
+import decision_logic_extractor_functions
+import importlib
+importlib.reload(decision_logic_extractor_functions)
+from decision_logic_extractor_functions import *
 
 # --------------------------------------------------------------------------------------------------
 # Ex 1: If A then ACTION --> So only one object, one condition for object and one action
 doc = sp("Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny.")
-condition_consequence_extractor_v4(doc)
-get_dep_parse(doc)
+
 # --------------------------------------------------------------------------------------------------
 # Ex 2: If A and B then ACTION / If A or B then ACTION (SAME DEPENDENCY STRUCTURE FOR AND AND OR)
 
@@ -165,7 +167,7 @@ test_data = pd.read_csv(r"../textual_data/test_data_csv_v2.csv", sep=';')
 sentences_spacy = get_spacy_lib(only_sentences)
 
 # A discount of 4% and otherwise 9% is given when the order exceeds 10 units.
-for sentence in sentences_spacy['Dataset_7']:
+for sentence in sentences_spacy['Dataset_1']:
     print('######################################################')
     print('----- NEXT SENTENCE -----')
     print(sentence)
@@ -186,16 +188,11 @@ for sentence in sentences_spacy['Dataset_7']:
         print(cons)
         print('')
         print('LOW LEVEL')
-        dictiona = get_full_dmn_rule(sentence)
+        dictiona = get_rule_components(sentence)
         print('IF: ', dictiona['if'])
         print('THEN: ', dictiona['then'])
         print('ELSE: ', dictiona['else'])
         # print(dictiona['binder_if'], dictiona['binder_then'], dictiona['binder_else'])
     else:
         print(cond_cons)
-        #print(get_lower_level_rule(sentence))
         print('')
-
-doc = sp("If the loan lies in between 3000 and 6000 euros and the customer is a company, then an interest rate of 0.05% applies.")
-condition_consequence_extractor_v3(doc)
-get_dep_parse(doc)

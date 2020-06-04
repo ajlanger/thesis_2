@@ -1,8 +1,8 @@
 # %% import libraries ------------------------------------------------------------------------------
-from decision_logic_extractor import *
-import decision_logic_extractor
+import decision_logic_extractor_functions
 import importlib
-importlib.reload(decision_logic_extractor)
+importlib.reload(decision_logic_extractor_functions)
+from decision_logic_extractor_functions import *
 # %% Testing functions
 #####################################################################################
 #####################################################################################
@@ -108,8 +108,29 @@ def extract_vars_vals_signs(row='', rowname='low_if', segment='if', extracted_lo
     return extracted_vars, extracted_vals, extracted_signs, desired_vars, desired_vals, desired_signs
 
 
+#################################################################################################
+#################################################################################################
+# %%
+
+# ██████  ██████  ███████  ██████ ██ ███████ ██  ██████  ███    ██
+# ██   ██ ██   ██ ██      ██      ██ ██      ██ ██    ██ ████   ██
+# ██████  ██████  █████   ██      ██ ███████ ██ ██    ██ ██ ██  ██
+# ██      ██   ██ ██      ██      ██      ██ ██ ██    ██ ██  ██ ██
+# ██      ██   ██ ███████  ██████ ██ ███████ ██  ██████  ██   ████
+
+# ██████  ███████  ██████  █████  ██      ██
+# ██   ██ ██      ██      ██   ██ ██      ██
+# ██████  █████   ██      ███████ ██      ██
+# ██   ██ ██      ██      ██   ██ ██      ██
+# ██   ██ ███████  ██████ ██   ██ ███████ ███████
+
+#  ██████  ██████  ███    ███ ██████  ██    ██ ████████  █████  ████████ ██  ██████  ███    ██
+# ██      ██    ██ ████  ████ ██   ██ ██    ██    ██    ██   ██    ██    ██ ██    ██ ████   ██
+# ██      ██    ██ ██ ████ ██ ██████  ██    ██    ██    ███████    ██    ██ ██    ██ ██ ██  ██
+# ██      ██    ██ ██  ██  ██ ██      ██    ██    ██    ██   ██    ██    ██ ██    ██ ██  ██ ██
+#  ██████  ██████  ██      ██ ██       ██████     ██    ██   ██    ██    ██  ██████  ██   ████
 ####################################################################################################
-# %% Testing phase #################################################################################
+# Testing phase ####################################################################################
 # Import test data
 test_data = pd.read_csv(r"../textual_data/test_data_csv_v2.csv", sep=';')
 
@@ -134,7 +155,7 @@ identified_conditions, identified_consequences, identified_ifs_vars, identified_
 
 for index, row in test_data.iterrows():
     # Automatic extraction
-    extracted_cond_cons = condition_consequence_extractor_v3(sp(row['Sentences']))
+    extracted_cond_cons = condition_consequence_extractor(sp(row['Sentences']))
     # Desired extractions
     desired_condition = row['Condition'].split(' ')
     desired_consequence = row['Consequence'].split(' ')
@@ -142,7 +163,7 @@ for index, row in test_data.iterrows():
     # Condition and consequences
     try:
         if extracted_cond_cons not in ['No conditional statements could be extracted in spite of a condition being present.', 'No conditional statement in sentence']:
-            extracted_low_level = get_full_dmn_rule(sp(row['Sentences']))
+            extracted_low_level = get_rule_components(sp(row['Sentences']))
             # -------------------------------------------------------------------------
             # identified conditions ---------------------------------------------------
             identified_conditions += 1
@@ -457,6 +478,22 @@ else_sign_f_score
 else_f_score = (else_var_f_score + else_val_f_score + else_sign_f_score)/3
 
 ##########################################################################################
+# OVERALL PRECISION AND RECALL
+high_level_precision = (cond_precision + cons_precision)/2
+high_level_precision
+high_level_recall = (cond_recall + cons_recall)/2
+high_level_recall
+
+low_level_precision = (if_var_precision + if_val_precision + if_sign_precision + then_var_precision + then_val_precision + then_sign_precision + else_var_precision + else_val_precision + else_sign_precision)/9
+low_level_precision
+low_level_recall = (if_var_recall + if_val_recall + if_sign_recall + then_var_recall + then_val_recall + then_sign_recall + else_var_recall + else_val_recall + else_sign_recall)/9
+low_level_recall
+
+overall_precision = (high_level_precision + low_level_precision)/2
+overall_precision
+overall_recall = (high_level_recall + low_level_recall)/2
+overall_recall
+
 # OVERALL F-SCORE
 high_level_extractor_f_score = (cond_f_score+cons_f_score)/2
 high_level_extractor_f_score
@@ -466,3 +503,37 @@ low_level_extractor_f_score
 
 overall_f_score = (high_level_extractor_f_score + low_level_extractor_f_score)/2
 overall_f_score
+
+calculate_f_score(overall_precision, overall_recall)
+
+#################################################################################################
+#################################################################################################
+
+# %%
+# ██ ███    ███ ██████  ██      ██ ███████ ██████
+# ██ ████  ████ ██   ██ ██      ██ ██      ██   ██
+# ██ ██ ████ ██ ██████  ██      ██ █████   ██   ██
+# ██ ██  ██  ██ ██      ██      ██ ██      ██   ██
+# ██ ██      ██ ██      ███████ ██ ███████ ██████
+
+# ███████ ██    ██  █████  ██      ██    ██  █████  ████████ ██  ██████  ███    ██
+# ██      ██    ██ ██   ██ ██      ██    ██ ██   ██    ██    ██ ██    ██ ████   ██
+# █████   ██    ██ ███████ ██      ██    ██ ███████    ██    ██ ██    ██ ██ ██  ██
+# ██       ██  ██  ██   ██ ██      ██    ██ ██   ██    ██    ██ ██    ██ ██  ██ ██
+# ███████   ████   ██   ██ ███████  ██████  ██   ██    ██    ██  ██████  ██   ████
+#################################################################################################
+#################################################################################################
+
+# Implied logical sentences
+test1 = sp("A new employee receives a mobile phone.")
+test2 = sp("5 euros are always charged.")
+test3 = sp("Costs should always be compensated.")
+test4 = sp("Laptops are repared for free.")
+test5 = sp("Employees that achieved their goals always are rewarded.")
+test6 = sp("New customers should always receive a discount.")
+test7 = sp("A sick employee should always stay at home.")
+test8 = sp("Orders above 10 euro should be shipped for free.")
+test9 = sp("Orders below 10 euro have a shiping cost of 2 euro.")
+test10 = sp("Merchandise that was bought 4 months ago should be cleaned.")
+
+implieds = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10]
