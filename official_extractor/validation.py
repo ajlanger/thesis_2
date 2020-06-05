@@ -4,6 +4,58 @@ import importlib
 importlib.reload(decision_logic_extractor_functions)
 from decision_logic_extractor_functions import *
 
+# %% ---- Functions for data exploration
+def get_dep_df(doc):
+    # Navigating parse tree
+    depparse = {}
+    text, dep, head_text, head_pos, children = ([] for i in range(5)) # Initialize lists
+    for token in doc:
+        text.append(token.text), dep.append(token.dep_), head_text.append(token.head.text), head_pos.append(token.head.pos_),children.append([child for child in token.children])
+
+    temp_list = []
+    for i in range(len(text)):
+        temp_list.append((text[i],dep[i]))
+    temp_dict = extract_pos_info(temp_list,dep_dict)
+
+    depparse['text'] = text
+    depparse['dep'] = dep
+    depparse['exp'] = temp_dict['exp']
+    depparse['head_text'] = head_text
+    depparse['head_pos'] = head_pos
+    depparse['children'] = children
+
+    df_temp = pd.DataFrame(depparse)
+    return df_temp
+
+# POS and DEP tag information
+pos_dict = {
+# For NLTK pos tagger
+'CC': 'coordinating conjunction','CD': 'cardinal digit','DT': 'determiner',
+'EX': 'existential there (like: \"there is\" ... think of it like \"there exists\")',
+'FW': 'foreign word','IN':  'preposition/subordinating conjunction','JJ': 'adjective \'big\'',
+'JJR': 'adjective, comparative \'bigger\'','JJS': 'adjective, superlative \'biggest\'',
+'LS': 'list marker 1)','MD': 'modal could, will','NN': 'noun, singular \'desk\'',
+'NNS': 'noun plural \'desks\'','NNP': 'proper noun, singular \'Harrison\'',
+'NNPS': 'proper noun, plural \'Americans\'','PDT': 'predeterminer \'all the kids\'',
+'POS': 'possessive ending parent\'s','PRP': 'personal pronoun I, he, she',
+'PRP$': 'possessive pronoun my, his, hers','RB': 'adverb very, silently,',
+'RBR': 'adverb, comparative better','RBS': 'adverb, superlative best',
+'RP': 'particle give up','TO': 'to go \'to\' the store.','UH': 'interjection errrrrrrrm',
+'VB': 'verb, base form take','VBD': 'verb, past tense took',
+'VBG': 'verb, gerund/present participle taking','VBN': 'verb, past participle taken',
+'VBP': 'verb, sing. present, non-3d take','VBZ': 'verb, 3rd person sing. present takes',
+'WDT': 'wh-determiner which','WP': 'wh-pronoun who, what','WP$': 'possessive wh-pronoun whose',
+'WRB': 'wh-abverb where, when','QF' : 'quantifier, bahut, thoda, kam (Hindi)','VM' : 'main verb',
+'PSP' : 'postposition, common in indian langs','DEM' : 'demonstrative, common in indian langs',
+
+# For Spacy POS tagger
+'PROPN': 'propper noun, like "apple"','ADP':'conjunction, subordinating or preposition','VERB': 'VERB', 'VBG':'VERB', 'NOUN': 'noun, names of people, places, things, feelings...', '$': 'Symbol', 'NUM':'number', 'SYM': 'Symbol', 'PRON': 'Pronoun, like I, she, you, him ...', 'PUNCT': 'Punctuation', 'X':'email', 'ADJ':'affix','CCONJ':'conjunction, coordinating', 'DET': 'determiner', 'ADJ':'adjective', 'PRON':'pronoun, personal','ADV': 'Adverb', 'PART':'possessive ending', 'AUX':'"be", "do", "have"'
+}
+
+dep_dict = {
+'ROOT':'root', 'root': 'root', 'dep': 'dependent', 'aux': 'auxiliary', 'aux:pass': 'passive auxiliary', 'cop': 'copula', 'arg': 'argument', 'agent': 'agent', 'comp': 'complement', 'acomp': 'adjectival complement', 'ccomp': 'clausal complement with internal subject', 'xcomp': 'clausal complement with external subject', 'obj': 'object', 'dobj': 'direct object', 'iobj': 'indirect object', 'pobj': 'object of preposition', 'subj': 'subject', 'nsubj': 'nominal subject', 'nsubj:pass': 'passive nominal subject', 'csubj': 'clausal subject', 'csubj:pass': 'passive clausal subject', 'cc': 'coordination', 'conj': 'conjunct', 'expl': 'expletive (expletive \“there\”)', 'mod': 'modifier', 'amod': 'adjectival modifier', 'appos': 'appositional modifier', 'advcl': 'adverbial clause modifier', 'det': 'determiner', 'predet': 'predeterminer', 'preconj': 'preconjunct', 'vmod': 'reduced, non-finite verbal modifier', 'mwe': 'multi-word expression modifier', 'mark': 'marker (word introducing an advcl or ccomp', 'advmod': 'adverbial modifier', 'neg': 'negation modifier', 'rcmod': 'relative clause modifier', 'quantmod': 'quantifier modifier', 'nn': 'noun compound modifier', 'npadvmod': 'noun phrase adverbial modifier', 'tmod': 'temporal modifier', 'num': 'numeric modifier', 'number': 'element of compound number', 'prep': 'prepositional modifier', 'poss': 'possession modifier', 'possessive': 'possessive modifier(s)', 'prt': 'phrasal verb particle', 'parataxis': 'parataxis', 'goeswith': 'goes with', 'punct': 'punctuation', 'ref': 'referent', 'sdep': 'semantic dependent', 'xsubj': 'controlling subject', 'compound': 'compound pair', 'nmod': 'nominal modifier', 'obl': 'oblique nominal', 'case': 'case marking', 'nmod': 'nominal modifier', 'nummod': 'nominal modifier'
+}
+
 # --------------------------------------------------------------------------------------------------
 # Ex 1: If A then ACTION --> So only one object, one condition for object and one action
 doc = sp("Tuscany sandwiches need to be made when the day is Thursday and the weather is sunny.")
@@ -26,12 +78,6 @@ doc = sp("In case that a person is between 19 and 21 years old and was not invol
 # All key elements in place, now last representation of the rules
 doc1 = sp("If the customer stays for 2 days rent is 100 euro .")
 doc2 = sp("If the customer stays for 2 days, rent is 100 euro .")
-
-condition_consequence_extractor_v3(doc1)
-condition_consequence_extractor_v3(doc2)
-
-get_dep_parse(doc1)
-get_dep_parse(doc2)
 
 ###################################################################################################
 ###################################################################################################

@@ -1,8 +1,0 @@
-'If the customer is 21 years old , then he needs to pay 200 euros .'
-IF STATEMENT:
-"SBAR : [['IN', 'If'], ['S', ['NP', ['DT', 'the'], ['NN', 'customer']], ['VP', ['VBZ', 'is'], ['ADJP', ['NP', ['CD', '21'], ['NNS', 'years']], ['JJ', 'old']]]]]"
-
-THEN STATEMENT:
-['ADVP', ['RB', 'then']],
-['NP', ['PRP', 'he']],
-['VP', ['VBZ', 'needs'], ['S', ['VP', ['TO', 'to'], ['VP', ['VB', 'pay'], ['NP', ['CD', '200'], ['NNS', 'euros']]]]]]

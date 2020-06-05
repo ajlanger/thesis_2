@@ -1,4 +1,4 @@
-from decision_logic_extractor import *
+from decision_logic_extractor_functions import *
 
 # Prepare validation data
 temp_list = get_texts('../textual_data/raw_data.txt')

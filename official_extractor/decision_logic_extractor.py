@@ -1,16 +1,8 @@
-import decision_logic_extractor_functions
-import importlib
-importlib.reload(decision_logic_extractor_functions)
 from decision_logic_extractor_functions import *
 
 def decision_logic_extractor(text):
     """
-    This function takes as input a text fragment. This could be either a sentence or a paragraph with decision logic.
-    ---
-    The user may also define the interested level of extraction. Possible values are:
-    - high
-    - low
-    - both
+    This function takes as input a text fragment. This could be either a sentence or a paragraph with decision logic. The input value should be a string.
     """
     # Step 0: Make spacy document
     spacy_doc = sp(text)
