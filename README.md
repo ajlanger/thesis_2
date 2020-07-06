@@ -29,7 +29,7 @@ get_rule_components(sp(doc))
 #############################################################
 # USE OF DECISION LOGIC EXTRACTOR ###########################
 #############################################################
-from official_extractor.decision_logic_extractor import *
+from official_extractor.decision_logic_extractor_functions import *
 
 decision_logic = decision_logic_extractor(doc)
 ```
